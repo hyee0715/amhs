@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.amhs.common.exception.BusinessException;
 import com.example.amhs.common.exception.ErrorCode;
 import com.example.amhs.edge.domain.AmhsEdge;
+import com.example.amhs.edge.domain.EdgeStatus;
 import com.example.amhs.edge.repository.EdgeRepository;
 import com.example.amhs.equipment.domain.Equipment;
 import com.example.amhs.equipment.domain.EquipmentType;
@@ -153,5 +154,72 @@ class TransferJobServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_JOB_STATUS);
+    }
+
+    @Test
+    @DisplayName("FAILED 상태의 Job은 현재 경로 상태 기준으로 재시도할 수 있다")
+    void retryTransferJob() {
+        TransferJobResponse created = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.FAILED, "EDGE_BLOCKED", null)
+        );
+
+        AmhsEdge edge = edgeRepository.findAll()
+                .stream()
+                .filter(it -> it.getFromNode().getCode().equals("STOCKER_01")
+                        && it.getToNode().getCode().equals("NODE_B"))
+                .findFirst()
+                .orElseThrow();
+        edge.changeStatus(EdgeStatus.BLOCKED);
+        edgeRepository.save(edge);
+
+        TransferJobResponse retried = transferJobService.retryTransferJob(created.id());
+        List<TransferJobHistoryResponse> histories = transferJobService.getTransferJobHistories(created.id());
+
+        assertThat(retried.status()).isEqualTo(TransferJobStatus.CREATED);
+        assertThat(retried.retryCount()).isEqualTo(1);
+        assertThat(retried.path()).isEqualTo(List.of("STOCKER_01", "NODE_A", "EQP_01"));
+        assertThat(retried.failureReason()).isNull();
+        assertThat(histories).hasSize(3);
+        assertThat(histories.get(2).status()).isEqualTo(TransferJobStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("FAILED 상태가 아닌 Job은 재시도할 수 없다")
+    void retryTransferJobWhenNotFailed() {
+        TransferJobResponse created = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+
+        assertThatThrownBy(() -> transferJobService.retryTransferJob(created.id()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_JOB_STATUS);
+    }
+
+    @Test
+    @DisplayName("재시도 시 현재 상태에서 경로가 없으면 ROUTE_NOT_FOUND 예외가 발생한다")
+    void retryTransferJobWhenRouteNotFound() {
+        TransferJobResponse created = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.FAILED, "EDGE_BLOCKED", null)
+        );
+
+        List<AmhsEdge> edges = edgeRepository.findAll();
+        edges.forEach(edge -> edge.changeStatus(EdgeStatus.BLOCKED));
+        edgeRepository.saveAll(edges);
+
+        assertThatThrownBy(() -> transferJobService.retryTransferJob(created.id()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.ROUTE_NOT_FOUND);
     }
 }

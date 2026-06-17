@@ -11,6 +11,8 @@ import com.example.amhs.node.dto.NodeCreateRequest;
 import com.example.amhs.node.dto.NodeResponse;
 import com.example.amhs.node.dto.NodeStatusUpdateRequest;
 import com.example.amhs.node.repository.NodeRepository;
+import com.example.amhs.transferjob.repository.TransferJobHistoryRepository;
+import com.example.amhs.transferjob.repository.TransferJobRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,8 +28,16 @@ class NodeServiceTest {
     @Autowired
     private NodeRepository nodeRepository;
 
+    @Autowired
+    private TransferJobHistoryRepository transferJobHistoryRepository;
+
+    @Autowired
+    private TransferJobRepository transferJobRepository;
+
     @BeforeEach
     void setUp() {
+        transferJobHistoryRepository.deleteAll();
+        transferJobRepository.deleteAll();
         nodeRepository.deleteAll();
     }
 

@@ -11,6 +11,8 @@ import com.example.amhs.equipment.dto.EquipmentCreateRequest;
 import com.example.amhs.equipment.dto.EquipmentResponse;
 import com.example.amhs.equipment.dto.EquipmentStatusUpdateRequest;
 import com.example.amhs.equipment.repository.EquipmentRepository;
+import com.example.amhs.transferjob.repository.TransferJobHistoryRepository;
+import com.example.amhs.transferjob.repository.TransferJobRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,8 +28,16 @@ class EquipmentServiceTest {
     @Autowired
     private EquipmentRepository equipmentRepository;
 
+    @Autowired
+    private TransferJobHistoryRepository transferJobHistoryRepository;
+
+    @Autowired
+    private TransferJobRepository transferJobRepository;
+
     @BeforeEach
     void setUp() {
+        transferJobHistoryRepository.deleteAll();
+        transferJobRepository.deleteAll();
         equipmentRepository.deleteAll();
     }
 

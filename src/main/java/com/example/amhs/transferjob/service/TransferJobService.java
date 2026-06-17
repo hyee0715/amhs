@@ -93,12 +93,37 @@ public class TransferJobService {
                 .toList();
     }
 
+    @Transactional
+    public TransferJobResponse retryTransferJob(Long id) {
+        TransferJob transferJob = findTransferJobById(id);
+        validateRetryableStatus(transferJob);
+
+        RouteResult routeResult = routeService.findRouteByDijkstra(
+                transferJob.getSourceNode().getCode(),
+                transferJob.getDestinationNode().getCode()
+        );
+
+        transferJob.retry(toJson(routeResult.path()), routeResult.totalEstimatedTimeSeconds());
+        saveHistory(transferJob, TransferJobStatus.CREATED, "Retry requested", null);
+
+        return toResponse(transferJob);
+    }
+
     private void validateStatusRequest(TransferJobStatusUpdateRequest request) {
         if (request.status() == TransferJobStatus.FAILED
                 && (request.reason() == null || request.reason().isBlank())) {
             throw new BusinessException(
                     ErrorCode.INVALID_JOB_STATUS,
                     "Failure reason is required when status is FAILED"
+            );
+        }
+    }
+
+    private void validateRetryableStatus(TransferJob transferJob) {
+        if (transferJob.getStatus() != TransferJobStatus.FAILED) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_JOB_STATUS,
+                    "Only failed transfer jobs can be retried"
             );
         }
     }

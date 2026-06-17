@@ -51,6 +51,11 @@ public class TransferJobController {
         return ResponseEntity.ok(transferJobService.updateTransferJobStatus(id, request));
     }
 
+    @PostMapping("/{id}/retry")
+    public ResponseEntity<TransferJobResponse> retryTransferJob(@PathVariable Long id) {
+        return ResponseEntity.ok(transferJobService.retryTransferJob(id));
+    }
+
     @GetMapping("/{id}/histories")
     public ResponseEntity<List<TransferJobHistoryResponse>> getTransferJobHistories(@PathVariable Long id) {
         return ResponseEntity.ok(transferJobService.getTransferJobHistories(id));

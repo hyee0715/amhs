@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.amhs.edge.domain.AmhsEdge;
+import com.example.amhs.edge.domain.EdgeStatus;
 import com.example.amhs.edge.repository.EdgeRepository;
 import com.example.amhs.equipment.domain.Equipment;
 import com.example.amhs.equipment.domain.EquipmentType;
@@ -146,5 +147,50 @@ class TransferJobControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].status").value("CREATED"))
                 .andExpect(jsonPath("$[0].pathSnapshot[0]").value("STOCKER_01"));
+    }
+
+    @Test
+    @DisplayName("Transfer Job retry API가 동작한다")
+    void retryTransferJob() throws Exception {
+        String response = mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-001",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "NORMAL"
+                                }
+                                """))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long id = objectMapper.readTree(response).path("id").asLong();
+
+        mockMvc.perform(patch("/api/transfer-jobs/{id}/status", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "FAILED",
+                                  "reason": "EDGE_BLOCKED"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        AmhsEdge edge = edgeRepository.findAll()
+                .stream()
+                .filter(it -> it.getFromNode().getCode().equals("STOCKER_01")
+                        && it.getToNode().getCode().equals("NODE_B"))
+                .findFirst()
+                .orElseThrow();
+        edge.changeStatus(EdgeStatus.BLOCKED);
+        edgeRepository.save(edge);
+
+        mockMvc.perform(post("/api/transfer-jobs/{id}/retry", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CREATED"))
+                .andExpect(jsonPath("$.retryCount").value(1))
+                .andExpect(jsonPath("$.path[1]").value("NODE_A"));
     }
 }

@@ -13,6 +13,8 @@ import com.example.amhs.node.domain.NodeStatus;
 import com.example.amhs.node.domain.NodeType;
 import com.example.amhs.node.repository.NodeRepository;
 import com.example.amhs.route.dto.RouteResult;
+import com.example.amhs.transferjob.repository.TransferJobHistoryRepository;
+import com.example.amhs.transferjob.repository.TransferJobRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,8 +34,16 @@ class RouteServiceTest {
     @Autowired
     private EdgeRepository edgeRepository;
 
+    @Autowired
+    private TransferJobHistoryRepository transferJobHistoryRepository;
+
+    @Autowired
+    private TransferJobRepository transferJobRepository;
+
     @BeforeEach
     void setUp() {
+        transferJobHistoryRepository.deleteAll();
+        transferJobRepository.deleteAll();
         edgeRepository.deleteAll();
         nodeRepository.deleteAll();
 

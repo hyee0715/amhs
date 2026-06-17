@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.amhs.node.repository.NodeRepository;
+import com.example.amhs.transferjob.repository.TransferJobHistoryRepository;
+import com.example.amhs.transferjob.repository.TransferJobRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,8 +32,16 @@ class NodeControllerTest {
     @Autowired
     private NodeRepository nodeRepository;
 
+    @Autowired
+    private TransferJobHistoryRepository transferJobHistoryRepository;
+
+    @Autowired
+    private TransferJobRepository transferJobRepository;
+
     @BeforeEach
     void setUp() {
+        transferJobHistoryRepository.deleteAll();
+        transferJobRepository.deleteAll();
         nodeRepository.deleteAll();
     }
 

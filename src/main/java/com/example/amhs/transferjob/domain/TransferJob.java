@@ -136,4 +136,15 @@ public class TransferJob extends BaseTimeEntity {
             this.failedAt = null;
         }
     }
+
+    public void retry(String path, int estimatedTimeSeconds) {
+        this.status = TransferJobStatus.CREATED;
+        this.path = path;
+        this.estimatedTimeSeconds = estimatedTimeSeconds;
+        this.retryCount += 1;
+        this.assignedEquipment = null;
+        this.failureReason = null;
+        this.completedAt = null;
+        this.failedAt = null;
+    }
 }

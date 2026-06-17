@@ -9,6 +9,8 @@ import com.example.amhs.edge.repository.EdgeRepository;
 import com.example.amhs.node.domain.AmhsNode;
 import com.example.amhs.node.domain.NodeType;
 import com.example.amhs.node.repository.NodeRepository;
+import com.example.amhs.transferjob.repository.TransferJobHistoryRepository;
+import com.example.amhs.transferjob.repository.TransferJobRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,8 +32,16 @@ class RouteControllerTest {
     @Autowired
     private EdgeRepository edgeRepository;
 
+    @Autowired
+    private TransferJobHistoryRepository transferJobHistoryRepository;
+
+    @Autowired
+    private TransferJobRepository transferJobRepository;
+
     @BeforeEach
     void setUp() {
+        transferJobHistoryRepository.deleteAll();
+        transferJobRepository.deleteAll();
         edgeRepository.deleteAll();
         nodeRepository.deleteAll();
 
