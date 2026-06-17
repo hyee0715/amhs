@@ -3,6 +3,7 @@ package com.example.amhs.common.exception;
 import com.example.amhs.common.response.ErrorResponse;
 import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -16,7 +17,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
         ErrorCode errorCode = exception.getErrorCode();
         return ResponseEntity.status(errorCode.getStatus())
-                .body(ErrorResponse.of(errorCode.name(), exception.getMessage()));
+                .body(ErrorResponse.of(
+                        errorCode.getStatus().value(),
+                        errorCode.name(),
+                        exception.getMessage()
+                ));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -30,7 +35,11 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
 
         return ResponseEntity.badRequest()
-                .body(ErrorResponse.of(ErrorCode.INVALID_REQUEST.name(), message));
+                .body(ErrorResponse.of(
+                        HttpStatus.BAD_REQUEST.value(),
+                        ErrorCode.INVALID_REQUEST.name(),
+                        message
+                ));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -38,13 +47,18 @@ public class GlobalExceptionHandler {
             ConstraintViolationException exception
     ) {
         return ResponseEntity.badRequest()
-                .body(ErrorResponse.of(ErrorCode.INVALID_REQUEST.name(), exception.getMessage()));
+                .body(ErrorResponse.of(
+                        HttpStatus.BAD_REQUEST.value(),
+                        ErrorCode.INVALID_REQUEST.name(),
+                        exception.getMessage()
+                ));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception exception) {
         return ResponseEntity.internalServerError()
                 .body(ErrorResponse.of(
+                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
                         ErrorCode.INTERNAL_SERVER_ERROR.name(),
                         ErrorCode.INTERNAL_SERVER_ERROR.getDefaultMessage()
                 ));

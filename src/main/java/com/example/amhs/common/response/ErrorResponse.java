@@ -1,10 +1,14 @@
 package com.example.amhs.common.response;
 
+import java.time.LocalDateTime;
+
 public record ErrorResponse(
+        int status,
         String code,
-        String message
+        String message,
+        LocalDateTime timestamp
 ) {
-    public static ErrorResponse of(String code, String message) {
-        return new ErrorResponse(code, message);
+    public static ErrorResponse of(int status, String code, String message) {
+        return new ErrorResponse(status, code, message, LocalDateTime.now());
     }
 }
