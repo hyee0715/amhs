@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: amhs
+  profiles:
+    default: local
+
+server:
+  port: 8080
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
