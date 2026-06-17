@@ -1,0 +1,150 @@
+package com.example.amhs.transferjob.controller;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.example.amhs.edge.domain.AmhsEdge;
+import com.example.amhs.edge.repository.EdgeRepository;
+import com.example.amhs.equipment.domain.Equipment;
+import com.example.amhs.equipment.domain.EquipmentType;
+import com.example.amhs.equipment.repository.EquipmentRepository;
+import com.example.amhs.node.domain.AmhsNode;
+import com.example.amhs.node.domain.NodeType;
+import com.example.amhs.node.repository.NodeRepository;
+import com.example.amhs.transferjob.repository.TransferJobHistoryRepository;
+import com.example.amhs.transferjob.repository.TransferJobRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+class TransferJobControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private TransferJobHistoryRepository transferJobHistoryRepository;
+
+    @Autowired
+    private TransferJobRepository transferJobRepository;
+
+    @Autowired
+    private EdgeRepository edgeRepository;
+
+    @Autowired
+    private EquipmentRepository equipmentRepository;
+
+    @Autowired
+    private NodeRepository nodeRepository;
+
+    @BeforeEach
+    void setUp() {
+        transferJobHistoryRepository.deleteAll();
+        transferJobRepository.deleteAll();
+        edgeRepository.deleteAll();
+        equipmentRepository.deleteAll();
+        nodeRepository.deleteAll();
+
+        AmhsNode stocker = nodeRepository.save(AmhsNode.create("STOCKER_01", "Stocker 01", NodeType.STOCKER));
+        AmhsNode nodeA = nodeRepository.save(AmhsNode.create("NODE_A", "Node A", NodeType.OHT_NODE));
+        AmhsNode nodeB = nodeRepository.save(AmhsNode.create("NODE_B", "Node B", NodeType.OHT_NODE));
+        AmhsNode eqp = nodeRepository.save(AmhsNode.create("EQP_01", "Equipment 01", NodeType.EQP));
+
+        edgeRepository.save(AmhsEdge.create(stocker, nodeA, 100, 10));
+        edgeRepository.save(AmhsEdge.create(nodeA, eqp, 100, 10));
+        edgeRepository.save(AmhsEdge.create(stocker, nodeB, 50, 5));
+        edgeRepository.save(AmhsEdge.create(nodeB, eqp, 50, 5));
+
+        equipmentRepository.save(Equipment.create("OHT_001", "OHT 001", EquipmentType.OHT));
+    }
+
+    @Test
+    @DisplayName("Transfer Job 생성 API가 동작한다")
+    void createTransferJob() throws Exception {
+        mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-001",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "NORMAL"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("CREATED"))
+                .andExpect(jsonPath("$.path[1]").value("NODE_B"));
+    }
+
+    @Test
+    @DisplayName("Transfer Job 상태 변경 API가 동작한다")
+    void updateTransferJobStatus() throws Exception {
+        String response = mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-001",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "NORMAL"
+                                }
+                                """))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long id = objectMapper.readTree(response).path("id").asLong();
+
+        mockMvc.perform(patch("/api/transfer-jobs/{id}/status", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "MOVING",
+                                  "reason": "Job started",
+                                  "assignedEquipmentCode": "OHT_001"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("MOVING"))
+                .andExpect(jsonPath("$.assignedEquipmentCode").value("OHT_001"));
+    }
+
+    @Test
+    @DisplayName("Transfer Job 이력 조회 API가 동작한다")
+    void getTransferJobHistories() throws Exception {
+        String response = mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-001",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "NORMAL"
+                                }
+                                """))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long id = objectMapper.readTree(response).path("id").asLong();
+
+        mockMvc.perform(get("/api/transfer-jobs/{id}/histories", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("CREATED"))
+                .andExpect(jsonPath("$[0].pathSnapshot[0]").value("STOCKER_01"));
+    }
+}
