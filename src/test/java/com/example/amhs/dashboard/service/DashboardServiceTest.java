@@ -1,5 +1,6 @@
 package com.example.amhs.dashboard.service;
 
+import com.example.amhs.alert.repository.AlertRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.amhs.dashboard.dto.DashboardSummaryResponse;
@@ -51,8 +52,12 @@ class DashboardServiceTest {
     @Autowired
     private EquipmentRepository equipmentRepository;
 
+    @Autowired
+    private AlertRepository alertRepository;
+
     @BeforeEach
     void setUp() {
+        alertRepository.deleteAll();
         transferJobHistoryRepository.deleteAll();
         transferJobRepository.deleteAll();
         edgeRepository.deleteAll();

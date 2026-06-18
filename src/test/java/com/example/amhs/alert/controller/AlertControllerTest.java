@@ -1,42 +1,48 @@
-package com.example.amhs.dashboard.controller;
+package com.example.amhs.alert.controller;
 
-import com.example.amhs.alert.repository.AlertRepository;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.amhs.alert.repository.AlertRepository;
+import com.example.amhs.alert.service.AlertService;
 import com.example.amhs.edge.domain.AmhsEdge;
-import com.example.amhs.edge.domain.EdgeStatus;
 import com.example.amhs.edge.repository.EdgeRepository;
 import com.example.amhs.equipment.domain.Equipment;
-import com.example.amhs.equipment.domain.EquipmentStatus;
 import com.example.amhs.equipment.domain.EquipmentType;
 import com.example.amhs.equipment.repository.EquipmentRepository;
 import com.example.amhs.node.domain.AmhsNode;
-import com.example.amhs.node.domain.NodeStatus;
 import com.example.amhs.node.domain.NodeType;
 import com.example.amhs.node.repository.NodeRepository;
 import com.example.amhs.transferjob.domain.TransferJobPriority;
-import com.example.amhs.transferjob.domain.TransferJobStatus;
 import com.example.amhs.transferjob.dto.TransferJobCreateRequest;
-import com.example.amhs.transferjob.dto.TransferJobStatusUpdateRequest;
 import com.example.amhs.transferjob.repository.TransferJobHistoryRepository;
 import com.example.amhs.transferjob.repository.TransferJobRepository;
 import com.example.amhs.transferjob.service.TransferJobService;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class DashboardControllerTest {
+class AlertControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private AlertService alertService;
+
+    @Autowired
+    private AlertRepository alertRepository;
 
     @Autowired
     private TransferJobService transferJobService;
@@ -57,7 +63,7 @@ class DashboardControllerTest {
     private EquipmentRepository equipmentRepository;
 
     @Autowired
-    private AlertRepository alertRepository;
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -68,6 +74,8 @@ class DashboardControllerTest {
         equipmentRepository.deleteAll();
         nodeRepository.deleteAll();
 
+        ReflectionTestUtils.setField(alertService, "assignedThresholdMinutes", 5L);
+
         AmhsNode stocker = nodeRepository.save(AmhsNode.create("STOCKER_01", "Stocker 01", NodeType.STOCKER));
         AmhsNode nodeA = nodeRepository.save(AmhsNode.create("NODE_A", "Node A", NodeType.OHT_NODE));
         AmhsNode eqp = nodeRepository.save(AmhsNode.create("EQP_01", "Equipment 01", NodeType.EQP));
@@ -75,39 +83,37 @@ class DashboardControllerTest {
         edgeRepository.save(AmhsEdge.create(stocker, nodeA, 100, 10));
         edgeRepository.save(AmhsEdge.create(nodeA, eqp, 100, 10));
 
-        AmhsNode blockedNode = nodeRepository.save(AmhsNode.create("NODE_B", "Node B", NodeType.OHT_NODE));
-        blockedNode.changeStatus(NodeStatus.BLOCKED);
-        nodeRepository.save(blockedNode);
-
-        AmhsEdge blockedEdge = edgeRepository.save(AmhsEdge.create(stocker, eqp, 200, 20));
-        blockedEdge.changeStatus(EdgeStatus.BLOCKED);
-        edgeRepository.save(blockedEdge);
-
-        Equipment errorEquipment = equipmentRepository.save(
-                Equipment.create("ROBOT_001", "Robot 001", EquipmentType.ROBOT)
-        );
-        errorEquipment.changeStatus(EquipmentStatus.ERROR);
-        equipmentRepository.save(errorEquipment);
+        equipmentRepository.save(Equipment.create("OHT_001", "OHT 001", EquipmentType.OHT));
 
         var created = transferJobService.createTransferJob(
                 new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
         );
-        transferJobService.updateTransferJobStatus(
-                created.id(),
-                new TransferJobStatusUpdateRequest(TransferJobStatus.COMPLETED, null, null)
+        transferJobService.assignTransferJob(created.id());
+
+        jdbcTemplate.update(
+                "update transfer_jobs set updated_at = ? where id = ?",
+                LocalDateTime.now().minusMinutes(10),
+                created.id()
         );
+        alertService.detectStuckAssignedJobs();
     }
 
     @Test
-    @DisplayName("Dashboard summary API가 동작한다")
-    void getSummary() throws Exception {
-        mockMvc.perform(get("/api/dashboard/summary"))
+    @DisplayName("알림 목록 조회 API가 동작한다")
+    void getAlerts() throws Exception {
+        mockMvc.perform(get("/api/alerts"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalJobs").value(1))
-                .andExpect(jsonPath("$.completedJobs").value(1))
-                .andExpect(jsonPath("$.successRate").value(100.0))
-                .andExpect(jsonPath("$.blockedNodeCount").value(1))
-                .andExpect(jsonPath("$.blockedEdgeCount").value(1))
-                .andExpect(jsonPath("$.equipmentErrorCount").value(1));
+                .andExpect(jsonPath("$[0].type").value("STUCK_JOB"))
+                .andExpect(jsonPath("$[0].status").value("OPEN"));
+    }
+
+    @Test
+    @DisplayName("알림 resolve API가 동작한다")
+    void resolveAlert() throws Exception {
+        Long alertId = alertRepository.findAll().getFirst().getId();
+
+        mockMvc.perform(patch("/api/alerts/{id}/resolve", alertId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
     }
 }

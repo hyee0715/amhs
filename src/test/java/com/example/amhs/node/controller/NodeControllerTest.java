@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.amhs.alert.repository.AlertRepository;
 import com.example.amhs.node.repository.NodeRepository;
 import com.example.amhs.transferjob.repository.TransferJobHistoryRepository;
 import com.example.amhs.transferjob.repository.TransferJobRepository;
@@ -38,8 +39,12 @@ class NodeControllerTest {
     @Autowired
     private TransferJobRepository transferJobRepository;
 
+    @Autowired
+    private AlertRepository alertRepository;
+
     @BeforeEach
     void setUp() {
+        alertRepository.deleteAll();
         transferJobHistoryRepository.deleteAll();
         transferJobRepository.deleteAll();
         nodeRepository.deleteAll();

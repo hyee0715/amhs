@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.amhs.common.exception.BusinessException;
 import com.example.amhs.common.exception.ErrorCode;
+import com.example.amhs.alert.repository.AlertRepository;
 import com.example.amhs.node.domain.NodeStatus;
 import com.example.amhs.node.domain.NodeType;
 import com.example.amhs.node.dto.NodeCreateRequest;
@@ -34,8 +35,12 @@ class NodeServiceTest {
     @Autowired
     private TransferJobRepository transferJobRepository;
 
+    @Autowired
+    private AlertRepository alertRepository;
+
     @BeforeEach
     void setUp() {
+        alertRepository.deleteAll();
         transferJobHistoryRepository.deleteAll();
         transferJobRepository.deleteAll();
         nodeRepository.deleteAll();

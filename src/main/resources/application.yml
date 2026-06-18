@@ -10,3 +10,11 @@ server:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+amhs:
+  alert:
+    scheduler:
+      fixed-delay-ms: 60000
+    thresholds:
+      assigned-minutes: 5
+      moving-grace-seconds: 0

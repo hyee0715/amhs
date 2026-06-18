@@ -3,6 +3,7 @@ package com.example.amhs.route.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.amhs.alert.repository.AlertRepository;
 import com.example.amhs.common.exception.BusinessException;
 import com.example.amhs.common.exception.ErrorCode;
 import com.example.amhs.edge.domain.AmhsEdge;
@@ -40,8 +41,12 @@ class RouteServiceTest {
     @Autowired
     private TransferJobRepository transferJobRepository;
 
+    @Autowired
+    private AlertRepository alertRepository;
+
     @BeforeEach
     void setUp() {
+        alertRepository.deleteAll();
         transferJobHistoryRepository.deleteAll();
         transferJobRepository.deleteAll();
         edgeRepository.deleteAll();
