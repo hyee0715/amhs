@@ -14,6 +14,7 @@ import com.example.amhs.node.domain.NodeStatus;
 import com.example.amhs.node.domain.NodeType;
 import com.example.amhs.node.repository.NodeRepository;
 import com.example.amhs.route.dto.RouteResult;
+import com.example.amhs.route.dto.RouteSearchStrategy;
 import com.example.amhs.transferjob.repository.TransferJobHistoryRepository;
 import com.example.amhs.transferjob.repository.TransferJobRepository;
 import java.util.List;
@@ -85,10 +86,45 @@ class RouteServiceTest {
     void findRouteByDijkstra() {
         RouteResult result = routeService.findRouteByDijkstra("STOCKER_01", "EQP_01");
 
-        assertThat(result.algorithm()).isEqualTo("DIJKSTRA");
+        assertThat(result.algorithm()).isEqualTo("DIJKSTRA_TIME");
         assertThat(result.path()).isEqualTo(List.of("STOCKER_01", "NODE_B", "NODE_C", "EQP_01"));
         assertThat(result.totalEstimatedTimeSeconds()).isEqualTo(15);
         assertThat(result.totalDistance()).isEqualTo(240);
+    }
+
+    @Test
+    @DisplayName("혼잡도 반영 전략은 congestionLevel이 낮은 경로를 선택한다")
+    void findRouteByDijkstraCongestionAware() {
+        AmhsEdge edge1 = edgeRepository.findAll().stream()
+                .filter(it -> it.getFromNode().getCode().equals("STOCKER_01")
+                        && it.getToNode().getCode().equals("NODE_B"))
+                .findFirst()
+                .orElseThrow();
+        edge1.changeCongestionLevel(70);
+
+        AmhsEdge edge2 = edgeRepository.findAll().stream()
+                .filter(it -> it.getFromNode().getCode().equals("NODE_B")
+                        && it.getToNode().getCode().equals("NODE_C"))
+                .findFirst()
+                .orElseThrow();
+        edge2.changeCongestionLevel(70);
+
+        AmhsEdge edge3 = edgeRepository.findAll().stream()
+                .filter(it -> it.getFromNode().getCode().equals("NODE_C")
+                        && it.getToNode().getCode().equals("EQP_01"))
+                .findFirst()
+                .orElseThrow();
+        edge3.changeCongestionLevel(70);
+        edgeRepository.saveAll(List.of(edge1, edge2, edge3));
+
+        RouteResult result = routeService.findRouteByDijkstra(
+                "STOCKER_01",
+                "EQP_01",
+                RouteSearchStrategy.CONGESTION_AWARE
+        );
+
+        assertThat(result.algorithm()).isEqualTo("DIJKSTRA_CONGESTION_AWARE");
+        assertThat(result.path()).isEqualTo(List.of("STOCKER_01", "NODE_A", "EQP_01"));
     }
 
     @Test

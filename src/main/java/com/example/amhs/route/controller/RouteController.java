@@ -1,6 +1,7 @@
 package com.example.amhs.route.controller;
 
 import com.example.amhs.route.dto.RouteResult;
+import com.example.amhs.route.dto.RouteSearchStrategy;
 import com.example.amhs.route.service.RouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -27,8 +28,9 @@ public class RouteController {
     @GetMapping("/dijkstra")
     public ResponseEntity<RouteResult> getDijkstraRoute(
             @RequestParam("source") String source,
-            @RequestParam("destination") String destination
+            @RequestParam("destination") String destination,
+            @RequestParam(name = "strategy", defaultValue = "TIME") RouteSearchStrategy strategy
     ) {
-        return ResponseEntity.ok(routeService.findRouteByDijkstra(source, destination));
+        return ResponseEntity.ok(routeService.findRouteByDijkstra(source, destination, strategy));
     }
 }

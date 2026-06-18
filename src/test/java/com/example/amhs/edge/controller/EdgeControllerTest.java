@@ -72,12 +72,14 @@ class EdgeControllerTest {
                                   "toNodeCode": "NODE_A",
                                   "distance": 100,
                                   "estimatedTimeSeconds": 30,
+                                  "congestionLevel": 15,
                                   "bidirectional": false
                                 }
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$[0].fromNodeCode").value("STOCKER_01"))
-                .andExpect(jsonPath("$[0].toNodeCode").value("NODE_A"));
+                .andExpect(jsonPath("$[0].toNodeCode").value("NODE_A"))
+                .andExpect(jsonPath("$[0].congestionLevel").value(15));
     }
 
     @Test
@@ -91,6 +93,7 @@ class EdgeControllerTest {
                                   "toNodeCode": "NODE_A",
                                   "distance": 100,
                                   "estimatedTimeSeconds": 30,
+                                  "congestionLevel": 0,
                                   "bidirectional": false
                                 }
                                 """))
@@ -122,6 +125,7 @@ class EdgeControllerTest {
                                   "toNodeCode": "NODE_A",
                                   "distance": 100,
                                   "estimatedTimeSeconds": 30,
+                                  "congestionLevel": 0,
                                   "bidirectional": false
                                 }
                                 """))
@@ -143,6 +147,7 @@ class EdgeControllerTest {
                                   "toNodeCode": "NODE_A",
                                   "distance": 100,
                                   "estimatedTimeSeconds": 30,
+                                  "congestionLevel": 0,
                                   "bidirectional": false
                                 }
                                 """))
@@ -164,5 +169,37 @@ class EdgeControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.code").value("EDGE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("Edge 혼잡도를 변경할 수 있다")
+    void updateEdgeCongestion() throws Exception {
+        String response = mockMvc.perform(post("/api/edges")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fromNodeCode": "STOCKER_01",
+                                  "toNodeCode": "NODE_A",
+                                  "distance": 100,
+                                  "estimatedTimeSeconds": 30,
+                                  "congestionLevel": 0,
+                                  "bidirectional": false
+                                }
+                                """))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long id = objectMapper.readTree(response).get(0).path("id").asLong();
+
+        mockMvc.perform(patch("/api/edges/{id}/congestion", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "congestionLevel": 80
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.congestionLevel").value(80));
     }
 }

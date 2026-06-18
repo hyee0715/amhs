@@ -1,5 +1,6 @@
 package com.example.amhs.edge.controller;
 
+import com.example.amhs.edge.dto.EdgeCongestionUpdateRequest;
 import com.example.amhs.edge.dto.EdgeCreateRequest;
 import com.example.amhs.edge.dto.EdgeResponse;
 import com.example.amhs.edge.dto.EdgeStatusUpdateRequest;
@@ -46,5 +47,13 @@ public class EdgeController {
             @Valid @RequestBody EdgeStatusUpdateRequest request
     ) {
         return ResponseEntity.ok(edgeService.updateEdgeStatus(id, request));
+    }
+
+    @PatchMapping("/{id}/congestion")
+    public ResponseEntity<EdgeResponse> updateEdgeCongestion(
+            @PathVariable Long id,
+            @Valid @RequestBody EdgeCongestionUpdateRequest request
+    ) {
+        return ResponseEntity.ok(edgeService.updateEdgeCongestion(id, request));
     }
 }

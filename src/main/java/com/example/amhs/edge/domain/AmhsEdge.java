@@ -42,6 +42,9 @@ public class AmhsEdge extends BaseTimeEntity {
     @Column(nullable = false)
     private int estimatedTimeSeconds;
 
+    @Column(nullable = false)
+    private int congestionLevel;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private EdgeStatus status;
@@ -52,12 +55,14 @@ public class AmhsEdge extends BaseTimeEntity {
             AmhsNode toNode,
             int distance,
             int estimatedTimeSeconds,
+            int congestionLevel,
             EdgeStatus status
     ) {
         this.fromNode = fromNode;
         this.toNode = toNode;
         this.distance = distance;
         this.estimatedTimeSeconds = estimatedTimeSeconds;
+        this.congestionLevel = congestionLevel;
         this.status = status;
     }
 
@@ -72,11 +77,16 @@ public class AmhsEdge extends BaseTimeEntity {
                 .toNode(toNode)
                 .distance(distance)
                 .estimatedTimeSeconds(estimatedTimeSeconds)
+                .congestionLevel(0)
                 .status(EdgeStatus.AVAILABLE)
                 .build();
     }
 
     public void changeStatus(EdgeStatus status) {
         this.status = status;
+    }
+
+    public void changeCongestionLevel(int congestionLevel) {
+        this.congestionLevel = congestionLevel;
     }
 }

@@ -7,6 +7,7 @@ import com.example.amhs.alert.repository.AlertRepository;
 import com.example.amhs.common.exception.BusinessException;
 import com.example.amhs.common.exception.ErrorCode;
 import com.example.amhs.edge.domain.EdgeStatus;
+import com.example.amhs.edge.dto.EdgeCongestionUpdateRequest;
 import com.example.amhs.edge.dto.EdgeCreateRequest;
 import com.example.amhs.edge.dto.EdgeResponse;
 import com.example.amhs.edge.dto.EdgeStatusUpdateRequest;
@@ -60,12 +61,13 @@ class EdgeServiceTest {
     @DisplayName("단방향 Edge를 등록할 수 있다")
     void createEdge() {
         var responses = edgeService.createEdge(
-                new EdgeCreateRequest("STOCKER_01", "NODE_A", 100, 30, false)
+                new EdgeCreateRequest("STOCKER_01", "NODE_A", 100, 30, 15, false)
         );
 
         assertThat(responses).hasSize(1);
         assertThat(responses.getFirst().fromNodeCode()).isEqualTo("STOCKER_01");
         assertThat(responses.getFirst().toNodeCode()).isEqualTo("NODE_A");
+        assertThat(responses.getFirst().congestionLevel()).isEqualTo(15);
         assertThat(responses.getFirst().status()).isEqualTo(EdgeStatus.AVAILABLE);
     }
 
@@ -73,7 +75,7 @@ class EdgeServiceTest {
     @DisplayName("bidirectional이 true면 역방향 Edge도 함께 생성된다")
     void createBidirectionalEdge() {
         var responses = edgeService.createEdge(
-                new EdgeCreateRequest("STOCKER_01", "NODE_A", 100, 30, true)
+                new EdgeCreateRequest("STOCKER_01", "NODE_A", 100, 30, 10, true)
         );
 
         assertThat(responses).hasSize(2);
@@ -83,10 +85,10 @@ class EdgeServiceTest {
     @Test
     @DisplayName("중복 Edge를 등록하면 DUPLICATED_EDGE 예외가 발생한다")
     void createDuplicateEdge() {
-        edgeService.createEdge(new EdgeCreateRequest("STOCKER_01", "NODE_A", 100, 30, false));
+        edgeService.createEdge(new EdgeCreateRequest("STOCKER_01", "NODE_A", 100, 30, 0, false));
 
         assertThatThrownBy(() ->
-                edgeService.createEdge(new EdgeCreateRequest("STOCKER_01", "NODE_A", 120, 40, false))
+                edgeService.createEdge(new EdgeCreateRequest("STOCKER_01", "NODE_A", 120, 40, 0, false))
         )
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
@@ -97,7 +99,7 @@ class EdgeServiceTest {
     @DisplayName("없는 Node code로 Edge를 등록하면 NODE_NOT_FOUND 예외가 발생한다")
     void createEdgeWithInvalidNodeCode() {
         assertThatThrownBy(() ->
-                edgeService.createEdge(new EdgeCreateRequest("UNKNOWN", "NODE_A", 100, 30, false))
+                edgeService.createEdge(new EdgeCreateRequest("UNKNOWN", "NODE_A", 100, 30, 0, false))
         )
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
@@ -108,7 +110,7 @@ class EdgeServiceTest {
     @DisplayName("Edge 상태를 변경할 수 있다")
     void updateEdgeStatus() {
         EdgeResponse created = edgeService.createEdge(
-                new EdgeCreateRequest("STOCKER_01", "NODE_A", 100, 30, false)
+                new EdgeCreateRequest("STOCKER_01", "NODE_A", 100, 30, 0, false)
         ).getFirst();
 
         EdgeResponse updated = edgeService.updateEdgeStatus(
@@ -117,6 +119,21 @@ class EdgeServiceTest {
         );
 
         assertThat(updated.status()).isEqualTo(EdgeStatus.BLOCKED);
+    }
+
+    @Test
+    @DisplayName("Edge 혼잡도를 변경할 수 있다")
+    void updateEdgeCongestion() {
+        EdgeResponse created = edgeService.createEdge(
+                new EdgeCreateRequest("STOCKER_01", "NODE_A", 100, 30, 0, false)
+        ).getFirst();
+
+        EdgeResponse updated = edgeService.updateEdgeCongestion(
+                created.id(),
+                new EdgeCongestionUpdateRequest(70)
+        );
+
+        assertThat(updated.congestionLevel()).isEqualTo(70);
     }
 
     @Test

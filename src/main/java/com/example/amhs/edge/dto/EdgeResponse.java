@@ -10,6 +10,7 @@ public record EdgeResponse(
         String toNodeCode,
         int distance,
         int estimatedTimeSeconds,
+        int congestionLevel,
         EdgeStatus status,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -21,6 +22,7 @@ public record EdgeResponse(
                 edge.getToNode().getCode(),
                 edge.getDistance(),
                 edge.getEstimatedTimeSeconds(),
+                edge.getCongestionLevel(),
                 edge.getStatus(),
                 edge.getCreatedAt(),
                 edge.getUpdatedAt()

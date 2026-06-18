@@ -82,8 +82,34 @@ class RouteControllerTest {
                         .param("source", "STOCKER_01")
                         .param("destination", "EQP_01"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.algorithm").value("DIJKSTRA"))
+                .andExpect(jsonPath("$.algorithm").value("DIJKSTRA_TIME"))
                 .andExpect(jsonPath("$.totalEstimatedTimeSeconds").value(15));
+    }
+
+    @Test
+    @DisplayName("혼잡도 반영 Dijkstra 경로 조회 API가 동작한다")
+    void getCongestionAwareDijkstraRoute() throws Exception {
+        var edges = edgeRepository.findAll();
+        edges.forEach(edge -> {
+            if (edge.getFromNode().getCode().equals("STOCKER_01") && edge.getToNode().getCode().equals("NODE_B")) {
+                edge.changeCongestionLevel(70);
+            }
+            if (edge.getFromNode().getCode().equals("NODE_B") && edge.getToNode().getCode().equals("NODE_C")) {
+                edge.changeCongestionLevel(70);
+            }
+            if (edge.getFromNode().getCode().equals("NODE_C") && edge.getToNode().getCode().equals("EQP_01")) {
+                edge.changeCongestionLevel(70);
+            }
+        });
+        edgeRepository.saveAll(edges);
+
+        mockMvc.perform(get("/api/routes/dijkstra")
+                        .param("source", "STOCKER_01")
+                        .param("destination", "EQP_01")
+                        .param("strategy", "CONGESTION_AWARE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.algorithm").value("DIJKSTRA_CONGESTION_AWARE"))
+                .andExpect(jsonPath("$.path[1]").value("NODE_A"));
     }
 
     @Test

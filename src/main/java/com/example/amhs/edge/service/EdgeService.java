@@ -3,6 +3,7 @@ package com.example.amhs.edge.service;
 import com.example.amhs.common.exception.BusinessException;
 import com.example.amhs.common.exception.ErrorCode;
 import com.example.amhs.edge.domain.AmhsEdge;
+import com.example.amhs.edge.dto.EdgeCongestionUpdateRequest;
 import com.example.amhs.edge.dto.EdgeCreateRequest;
 import com.example.amhs.edge.dto.EdgeResponse;
 import com.example.amhs.edge.dto.EdgeStatusUpdateRequest;
@@ -29,9 +30,9 @@ public class EdgeService {
 
         validateDuplicateEdge(request.fromNodeCode(), request.toNodeCode());
 
-        AmhsEdge edge = edgeRepository.save(
-                AmhsEdge.create(fromNode, toNode, request.distance(), request.estimatedTimeSeconds())
-        );
+        AmhsEdge edge = AmhsEdge.create(fromNode, toNode, request.distance(), request.estimatedTimeSeconds());
+        edge.changeCongestionLevel(request.congestionLevel());
+        edge = edgeRepository.save(edge);
 
         if (!request.bidirectional()) {
             return List.of(EdgeResponse.from(edge));
@@ -39,9 +40,9 @@ public class EdgeService {
 
         validateDuplicateEdge(request.toNodeCode(), request.fromNodeCode());
 
-        AmhsEdge reverseEdge = edgeRepository.save(
-                AmhsEdge.create(toNode, fromNode, request.distance(), request.estimatedTimeSeconds())
-        );
+        AmhsEdge reverseEdge = AmhsEdge.create(toNode, fromNode, request.distance(), request.estimatedTimeSeconds());
+        reverseEdge.changeCongestionLevel(request.congestionLevel());
+        reverseEdge = edgeRepository.save(reverseEdge);
 
         return List.of(EdgeResponse.from(edge), EdgeResponse.from(reverseEdge));
     }
@@ -61,6 +62,13 @@ public class EdgeService {
     public EdgeResponse updateEdgeStatus(Long id, EdgeStatusUpdateRequest request) {
         AmhsEdge edge = findEdgeById(id);
         edge.changeStatus(request.status());
+        return EdgeResponse.from(edge);
+    }
+
+    @Transactional
+    public EdgeResponse updateEdgeCongestion(Long id, EdgeCongestionUpdateRequest request) {
+        AmhsEdge edge = findEdgeById(id);
+        edge.changeCongestionLevel(request.congestionLevel());
         return EdgeResponse.from(edge);
     }
 

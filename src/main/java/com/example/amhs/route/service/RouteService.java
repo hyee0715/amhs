@@ -9,6 +9,7 @@ import com.example.amhs.node.domain.AmhsNode;
 import com.example.amhs.node.domain.NodeStatus;
 import com.example.amhs.node.repository.NodeRepository;
 import com.example.amhs.route.dto.RouteResult;
+import com.example.amhs.route.dto.RouteSearchStrategy;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,7 +51,14 @@ public class RouteService {
         while (!queue.isEmpty()) {
             String current = queue.poll();
             if (current.equals(destinationCode)) {
-                return createRouteResult(sourceCode, destinationCode, "BFS", previous, graph);
+                return createRouteResult(
+                        sourceCode,
+                        destinationCode,
+                        "BFS",
+                        previous,
+                        graph,
+                        RouteSearchStrategy.TIME
+                );
             }
 
             for (RouteEdge next : graph.getOrDefault(current, List.of())) {
@@ -65,6 +73,14 @@ public class RouteService {
     }
 
     public RouteResult findRouteByDijkstra(String sourceCode, String destinationCode) {
+        return findRouteByDijkstra(sourceCode, destinationCode, RouteSearchStrategy.TIME);
+    }
+
+    public RouteResult findRouteByDijkstra(
+            String sourceCode,
+            String destinationCode,
+            RouteSearchStrategy strategy
+    ) {
         AmhsNode sourceNode = findNodeByCode(sourceCode);
         AmhsNode destinationNode = findNodeByCode(destinationCode);
 
@@ -87,11 +103,11 @@ public class RouteService {
             }
 
             if (current.code().equals(destinationCode)) {
-                return createRouteResult(sourceCode, destinationCode, "DIJKSTRA", previous, graph);
+                return createRouteResult(sourceCode, destinationCode, "DIJKSTRA", previous, graph, strategy);
             }
 
             for (RouteEdge next : graph.getOrDefault(current.code(), List.of())) {
-                int nextCost = current.cost() + next.estimatedTimeSeconds();
+                int nextCost = current.cost() + calculateWeight(next, strategy);
                 if (nextCost < timeDistance.getOrDefault(next.toCode(), Integer.MAX_VALUE)) {
                     timeDistance.put(next.toCode(), nextCost);
                     previous.put(next.toCode(), current.code());
@@ -108,7 +124,8 @@ public class RouteService {
             String destinationCode,
             String algorithm,
             Map<String, String> previous,
-            Map<String, List<RouteEdge>> graph
+            Map<String, List<RouteEdge>> graph,
+            RouteSearchStrategy strategy
     ) {
         List<String> path = reconstructPath(sourceCode, destinationCode, previous);
         int totalDistance = 0;
@@ -123,7 +140,7 @@ public class RouteService {
         return RouteResult.of(
                 sourceCode,
                 destinationCode,
-                algorithm,
+                algorithm + (algorithm.equals("DIJKSTRA") ? "_" + strategy.name() : ""),
                 path,
                 totalEstimatedTimeSeconds,
                 totalDistance
@@ -173,7 +190,7 @@ public class RouteService {
             }
 
             graph.get(fromCode).add(
-                    new RouteEdge(toCode, edge.getDistance(), edge.getEstimatedTimeSeconds())
+                    new RouteEdge(toCode, edge.getDistance(), edge.getEstimatedTimeSeconds(), edge.getCongestionLevel())
             );
         }
 
@@ -208,6 +225,13 @@ public class RouteService {
         }
     }
 
+    private int calculateWeight(RouteEdge edge, RouteSearchStrategy strategy) {
+        return switch (strategy) {
+            case TIME -> edge.estimatedTimeSeconds();
+            case CONGESTION_AWARE -> edge.estimatedTimeSeconds() + edge.congestionLevel();
+        };
+    }
+
     private AmhsNode findNodeByCode(String code) {
         return nodeRepository.findByCode(code)
                 .orElseThrow(() -> new BusinessException(
@@ -226,7 +250,8 @@ public class RouteService {
     private record RouteEdge(
             String toCode,
             int distance,
-            int estimatedTimeSeconds
+            int estimatedTimeSeconds,
+            int congestionLevel
     ) {
     }
 
