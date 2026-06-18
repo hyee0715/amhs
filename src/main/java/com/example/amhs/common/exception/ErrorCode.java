@@ -6,6 +6,7 @@ public enum ErrorCode {
     NODE_NOT_FOUND(HttpStatus.NOT_FOUND, "Node not found"),
     EDGE_NOT_FOUND(HttpStatus.NOT_FOUND, "Edge not found"),
     EQUIPMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Equipment not found"),
+    NO_AVAILABLE_EQUIPMENT(HttpStatus.BAD_REQUEST, "No available equipment"),
     TRANSFER_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "Transfer job not found"),
     ROUTE_NOT_FOUND(HttpStatus.NOT_FOUND, "Route not found"),
     INVALID_JOB_STATUS(HttpStatus.BAD_REQUEST, "Invalid transfer job status"),

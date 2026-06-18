@@ -10,6 +10,7 @@ import com.example.amhs.edge.domain.AmhsEdge;
 import com.example.amhs.edge.domain.EdgeStatus;
 import com.example.amhs.edge.repository.EdgeRepository;
 import com.example.amhs.equipment.domain.Equipment;
+import com.example.amhs.equipment.domain.EquipmentStatus;
 import com.example.amhs.equipment.domain.EquipmentType;
 import com.example.amhs.equipment.repository.EquipmentRepository;
 import com.example.amhs.node.domain.AmhsNode;
@@ -192,5 +193,107 @@ class TransferJobControllerTest {
                 .andExpect(jsonPath("$.status").value("CREATED"))
                 .andExpect(jsonPath("$.retryCount").value(1))
                 .andExpect(jsonPath("$.path[1]").value("NODE_A"));
+    }
+
+    @Test
+    @DisplayName("Transfer Job assign API가 동작한다")
+    void assignTransferJob() throws Exception {
+        String response = mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-001",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "NORMAL"
+                                }
+                                """))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long id = objectMapper.readTree(response).path("id").asLong();
+
+        mockMvc.perform(post("/api/transfer-jobs/{id}/assign", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ASSIGNED"))
+                .andExpect(jsonPath("$.assignedEquipmentCode").value("OHT_001"));
+    }
+
+    @Test
+    @DisplayName("Transfer Job assign-pending API가 우선순위 순서로 동작한다")
+    void assignPendingTransferJobs() throws Exception {
+        equipmentRepository.save(Equipment.create("OHT_002", "OHT 002", EquipmentType.OHT));
+
+        mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-001",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "NORMAL"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-002",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "URGENT"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-003",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "HIGH"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/transfer-jobs/assign-pending"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].carrierId").value("FOUP-002"))
+                .andExpect(jsonPath("$[0].status").value("ASSIGNED"))
+                .andExpect(jsonPath("$[1].carrierId").value("FOUP-003"))
+                .andExpect(jsonPath("$[1].status").value("ASSIGNED"));
+    }
+
+    @Test
+    @DisplayName("사용 가능한 장비가 없으면 assign API는 예외를 반환한다")
+    void assignTransferJobWhenNoAvailableEquipment() throws Exception {
+        var equipments = equipmentRepository.findAll();
+        equipments.forEach(equipment -> equipment.changeStatus(EquipmentStatus.ERROR));
+        equipmentRepository.saveAll(equipments);
+
+        String response = mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-001",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "NORMAL"
+                                }
+                                """))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long id = objectMapper.readTree(response).path("id").asLong();
+
+        mockMvc.perform(post("/api/transfer-jobs/{id}/assign", id))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("NO_AVAILABLE_EQUIPMENT"));
     }
 }

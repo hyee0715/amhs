@@ -3,6 +3,7 @@ package com.example.amhs.transferjob.service;
 import com.example.amhs.common.exception.BusinessException;
 import com.example.amhs.common.exception.ErrorCode;
 import com.example.amhs.equipment.domain.Equipment;
+import com.example.amhs.equipment.domain.EquipmentStatus;
 import com.example.amhs.equipment.repository.EquipmentRepository;
 import com.example.amhs.node.domain.AmhsNode;
 import com.example.amhs.node.repository.NodeRepository;
@@ -10,6 +11,7 @@ import com.example.amhs.route.dto.RouteResult;
 import com.example.amhs.route.service.RouteService;
 import com.example.amhs.transferjob.domain.TransferJob;
 import com.example.amhs.transferjob.domain.TransferJobHistory;
+import com.example.amhs.transferjob.domain.TransferJobPriority;
 import com.example.amhs.transferjob.domain.TransferJobStatus;
 import com.example.amhs.transferjob.dto.TransferJobCreateRequest;
 import com.example.amhs.transferjob.dto.TransferJobHistoryResponse;
@@ -20,6 +22,7 @@ import com.example.amhs.transferjob.repository.TransferJobRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -78,6 +81,7 @@ public class TransferJobService {
 
         TransferJob transferJob = findTransferJobById(id);
         Equipment equipment = findEquipmentIfPresent(request.assignedEquipmentCode());
+        releaseEquipmentIfTerminal(transferJob, request.status());
 
         transferJob.updateStatus(request.status(), equipment, request.reason());
         saveHistory(transferJob, request.status(), request.reason(), request.assignedEquipmentCode());
@@ -109,6 +113,44 @@ public class TransferJobService {
         return toResponse(transferJob);
     }
 
+    @Transactional
+    public TransferJobResponse assignTransferJob(Long id) {
+        TransferJob transferJob = findTransferJobById(id);
+        validateAssignableStatus(transferJob);
+
+        Equipment equipment = findAvailableEquipment();
+        equipment.changeStatus(EquipmentStatus.MOVING);
+        transferJob.assign(equipment);
+        saveHistory(transferJob, TransferJobStatus.ASSIGNED, "Auto assigned", equipment.getCode());
+
+        return toResponse(transferJob);
+    }
+
+    @Transactional
+    public List<TransferJobResponse> assignPendingTransferJobs() {
+        List<Equipment> availableEquipments = equipmentRepository.findByStatusOrderByIdAsc(EquipmentStatus.IDLE);
+        List<TransferJob> pendingJobs = transferJobRepository.findByStatus(TransferJobStatus.CREATED)
+                .stream()
+                .filter(job -> job.getAssignedEquipment() == null)
+                .sorted(pendingJobComparator())
+                .toList();
+
+        int assignCount = Math.min(availableEquipments.size(), pendingJobs.size());
+        for (int i = 0; i < assignCount; i++) {
+            Equipment equipment = availableEquipments.get(i);
+            TransferJob transferJob = pendingJobs.get(i);
+
+            equipment.changeStatus(EquipmentStatus.MOVING);
+            transferJob.assign(equipment);
+            saveHistory(transferJob, TransferJobStatus.ASSIGNED, "Auto assigned", equipment.getCode());
+        }
+
+        return pendingJobs.stream()
+                .limit(assignCount)
+                .map(this::toResponse)
+                .toList();
+    }
+
     private void validateStatusRequest(TransferJobStatusUpdateRequest request) {
         if (request.status() == TransferJobStatus.FAILED
                 && (request.reason() == null || request.reason().isBlank())) {
@@ -124,6 +166,15 @@ public class TransferJobService {
             throw new BusinessException(
                     ErrorCode.INVALID_JOB_STATUS,
                     "Only failed transfer jobs can be retried"
+            );
+        }
+    }
+
+    private void validateAssignableStatus(TransferJob transferJob) {
+        if (transferJob.getStatus() != TransferJobStatus.CREATED || transferJob.getAssignedEquipment() != null) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_JOB_STATUS,
+                    "Only unassigned created transfer jobs can be assigned"
             );
         }
     }
@@ -188,6 +239,46 @@ public class TransferJobService {
                         ErrorCode.EQUIPMENT_NOT_FOUND,
                         "Equipment not found: " + code
                 ));
+    }
+
+    private Equipment findAvailableEquipment() {
+        return equipmentRepository.findByStatusOrderByIdAsc(EquipmentStatus.IDLE)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.NO_AVAILABLE_EQUIPMENT,
+                        "No available equipment for assignment"
+                ));
+    }
+
+    private void releaseEquipmentIfTerminal(TransferJob transferJob, TransferJobStatus status) {
+        if (status == TransferJobStatus.COMPLETED
+                || status == TransferJobStatus.FAILED
+                || status == TransferJobStatus.CANCELED) {
+            Equipment assignedEquipment = transferJob.getAssignedEquipment();
+            if (assignedEquipment != null) {
+                assignedEquipment.changeStatus(EquipmentStatus.IDLE);
+            }
+        }
+    }
+
+    private Comparator<TransferJob> pendingJobComparator() {
+        return Comparator
+                .comparing(TransferJob::getPriority, this::comparePriority)
+                .thenComparing(TransferJob::getRetryCount)
+                .thenComparing(TransferJob::getCreatedAt);
+    }
+
+    private int comparePriority(TransferJobPriority left, TransferJobPriority right) {
+        return Integer.compare(priorityRank(right), priorityRank(left));
+    }
+
+    private int priorityRank(TransferJobPriority priority) {
+        return switch (priority) {
+            case URGENT -> 3;
+            case HIGH -> 2;
+            case NORMAL -> 1;
+        };
     }
 
     private TransferJob findTransferJobById(Long id) {

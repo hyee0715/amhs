@@ -9,6 +9,7 @@ import com.example.amhs.edge.domain.AmhsEdge;
 import com.example.amhs.edge.domain.EdgeStatus;
 import com.example.amhs.edge.repository.EdgeRepository;
 import com.example.amhs.equipment.domain.Equipment;
+import com.example.amhs.equipment.domain.EquipmentStatus;
 import com.example.amhs.equipment.domain.EquipmentType;
 import com.example.amhs.equipment.repository.EquipmentRepository;
 import com.example.amhs.node.domain.AmhsNode;
@@ -221,5 +222,83 @@ class TransferJobServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.ROUTE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("생성된 Job에 사용 가능한 장비를 자동 할당할 수 있다")
+    void assignTransferJob() {
+        TransferJobResponse created = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+
+        TransferJobResponse assigned = transferJobService.assignTransferJob(created.id());
+        List<TransferJobHistoryResponse> histories = transferJobService.getTransferJobHistories(created.id());
+
+        assertThat(assigned.status()).isEqualTo(TransferJobStatus.ASSIGNED);
+        assertThat(assigned.assignedEquipmentCode()).isEqualTo("OHT_001");
+        assertThat(equipmentRepository.findByCode("OHT_001").orElseThrow().getStatus())
+                .isEqualTo(EquipmentStatus.MOVING);
+        assertThat(histories).hasSize(2);
+        assertThat(histories.get(1).status()).isEqualTo(TransferJobStatus.ASSIGNED);
+        assertThat(histories.get(1).assignedEquipmentCode()).isEqualTo("OHT_001");
+    }
+
+    @Test
+    @DisplayName("할당 가능한 장비가 없으면 NO_AVAILABLE_EQUIPMENT 예외가 발생한다")
+    void assignTransferJobWhenNoAvailableEquipment() {
+        List<Equipment> equipments = equipmentRepository.findAll();
+        equipments.forEach(equipment -> equipment.changeStatus(EquipmentStatus.ERROR));
+        equipmentRepository.saveAll(equipments);
+
+        TransferJobResponse created = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+
+        assertThatThrownBy(() -> transferJobService.assignTransferJob(created.id()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.NO_AVAILABLE_EQUIPMENT);
+    }
+
+    @Test
+    @DisplayName("일괄 할당 시 우선순위가 높은 Job부터 IDLE 장비에 배정된다")
+    void assignPendingTransferJobs() {
+        equipmentRepository.save(Equipment.create("OHT_002", "OHT 002", EquipmentType.OHT));
+
+        TransferJobResponse normal = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+        TransferJobResponse urgent = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-002", "STOCKER_01", "EQP_01", TransferJobPriority.URGENT)
+        );
+        TransferJobResponse high = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-003", "STOCKER_01", "EQP_01", TransferJobPriority.HIGH)
+        );
+
+        List<TransferJobResponse> assigned = transferJobService.assignPendingTransferJobs();
+
+        assertThat(assigned).hasSize(2);
+        assertThat(assigned.get(0).id()).isEqualTo(urgent.id());
+        assertThat(assigned.get(0).status()).isEqualTo(TransferJobStatus.ASSIGNED);
+        assertThat(assigned.get(1).id()).isEqualTo(high.id());
+        assertThat(assigned.get(1).status()).isEqualTo(TransferJobStatus.ASSIGNED);
+        assertThat(transferJobService.getTransferJob(normal.id()).status()).isEqualTo(TransferJobStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("작업 완료 또는 실패 시 할당 장비는 다시 IDLE 상태가 된다")
+    void releaseEquipmentWhenTerminalStatus() {
+        TransferJobResponse created = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+        transferJobService.assignTransferJob(created.id());
+
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.COMPLETED, null, null)
+        );
+
+        assertThat(equipmentRepository.findByCode("OHT_001").orElseThrow().getStatus())
+                .isEqualTo(EquipmentStatus.IDLE);
     }
 }

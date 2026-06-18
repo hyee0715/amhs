@@ -56,6 +56,16 @@ public class TransferJobController {
         return ResponseEntity.ok(transferJobService.retryTransferJob(id));
     }
 
+    @PostMapping("/{id}/assign")
+    public ResponseEntity<TransferJobResponse> assignTransferJob(@PathVariable Long id) {
+        return ResponseEntity.ok(transferJobService.assignTransferJob(id));
+    }
+
+    @PostMapping("/assign-pending")
+    public ResponseEntity<List<TransferJobResponse>> assignPendingTransferJobs() {
+        return ResponseEntity.ok(transferJobService.assignPendingTransferJobs());
+    }
+
     @GetMapping("/{id}/histories")
     public ResponseEntity<List<TransferJobHistoryResponse>> getTransferJobHistories(@PathVariable Long id) {
         return ResponseEntity.ok(transferJobService.getTransferJobHistories(id));

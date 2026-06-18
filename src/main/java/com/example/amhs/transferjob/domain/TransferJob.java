@@ -147,4 +147,14 @@ public class TransferJob extends BaseTimeEntity {
         this.completedAt = null;
         this.failedAt = null;
     }
+
+    public void assign(Equipment equipment) {
+        this.status = TransferJobStatus.ASSIGNED;
+        this.assignedEquipment = equipment;
+        this.failureReason = null;
+    }
+
+    public void clearAssignedEquipment() {
+        this.assignedEquipment = null;
+    }
 }

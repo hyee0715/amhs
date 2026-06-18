@@ -22,4 +22,7 @@ public interface TransferJobRepository extends JpaRepository<TransferJob, Long> 
 
     @Query("select coalesce(avg(t.estimatedTimeSeconds), 0) from TransferJob t")
     Double findAverageEstimatedTimeSeconds();
+
+    @EntityGraph(attributePaths = {"sourceNode", "destinationNode", "assignedEquipment"})
+    List<TransferJob> findByStatus(TransferJobStatus status);
 }

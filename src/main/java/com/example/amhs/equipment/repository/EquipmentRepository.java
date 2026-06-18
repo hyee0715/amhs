@@ -2,6 +2,7 @@ package com.example.amhs.equipment.repository;
 
 import com.example.amhs.equipment.domain.Equipment;
 import com.example.amhs.equipment.domain.EquipmentStatus;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -12,4 +13,6 @@ public interface EquipmentRepository extends JpaRepository<Equipment, Long> {
     Optional<Equipment> findByCode(String code);
 
     long countByStatus(EquipmentStatus status);
+
+    List<Equipment> findByStatusOrderByIdAsc(EquipmentStatus status);
 }
