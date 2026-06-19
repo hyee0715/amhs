@@ -91,6 +91,11 @@ class DashboardServiceTest {
         var created = transferJobService.createTransferJob(
                 new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
         );
+        transferJobService.assignTransferJob(created.id());
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
+        );
         transferJobService.createTransferJob(
                 new TransferJobCreateRequest("FOUP-002", "STOCKER_01", "EQP_01", TransferJobPriority.HIGH)
         );
@@ -103,6 +108,11 @@ class DashboardServiceTest {
         var failed = transferJobService.createTransferJob(
                 new TransferJobCreateRequest("FOUP-003", "STOCKER_01", "EQP_01", TransferJobPriority.URGENT)
         );
+        transferJobService.assignTransferJob(failed.id());
+        transferJobService.updateTransferJobStatus(
+                failed.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
+        );
         transferJobService.updateTransferJobStatus(
                 failed.id(),
                 new TransferJobStatusUpdateRequest(TransferJobStatus.FAILED, "EDGE_BLOCKED", null)
@@ -111,9 +121,10 @@ class DashboardServiceTest {
         var moving = transferJobService.createTransferJob(
                 new TransferJobCreateRequest("FOUP-004", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
         );
+        transferJobService.assignTransferJob(moving.id());
         transferJobService.updateTransferJobStatus(
                 moving.id(),
-                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", "OHT_001")
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
         );
     }
 

@@ -83,6 +83,7 @@ class DashboardControllerTest {
         blockedEdge.changeStatus(EdgeStatus.BLOCKED);
         edgeRepository.save(blockedEdge);
 
+        equipmentRepository.save(Equipment.create("OHT_001", "OHT 001", EquipmentType.OHT));
         Equipment errorEquipment = equipmentRepository.save(
                 Equipment.create("ROBOT_001", "Robot 001", EquipmentType.ROBOT)
         );
@@ -91,6 +92,11 @@ class DashboardControllerTest {
 
         var created = transferJobService.createTransferJob(
                 new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+        transferJobService.assignTransferJob(created.id());
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
         );
         transferJobService.updateTransferJobStatus(
                 created.id(),

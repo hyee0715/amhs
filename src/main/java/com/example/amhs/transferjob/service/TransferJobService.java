@@ -80,6 +80,7 @@ public class TransferJobService {
         validateStatusRequest(request);
 
         TransferJob transferJob = findTransferJobById(id);
+        validateStatusTransition(transferJob.getStatus(), request.status());
         Equipment equipment = findEquipmentIfPresent(request.assignedEquipmentCode());
         releaseEquipmentIfTerminal(transferJob, request.status());
 
@@ -157,6 +158,33 @@ public class TransferJobService {
             throw new BusinessException(
                     ErrorCode.INVALID_JOB_STATUS,
                     "Failure reason is required when status is FAILED"
+            );
+        }
+    }
+
+    private void validateStatusTransition(TransferJobStatus currentStatus, TransferJobStatus targetStatus) {
+        if (currentStatus == targetStatus) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_JOB_STATUS_TRANSITION,
+                    "Invalid transfer job status transition: " + currentStatus + " -> " + targetStatus
+            );
+        }
+
+        boolean valid = switch (currentStatus) {
+            case CREATED -> targetStatus == TransferJobStatus.ASSIGNED || targetStatus == TransferJobStatus.CANCELED;
+            case ASSIGNED -> targetStatus == TransferJobStatus.MOVING
+                    || targetStatus == TransferJobStatus.FAILED
+                    || targetStatus == TransferJobStatus.CANCELED;
+            case MOVING -> targetStatus == TransferJobStatus.COMPLETED
+                    || targetStatus == TransferJobStatus.FAILED;
+            case FAILED -> false;
+            case COMPLETED, CANCELED -> false;
+        };
+
+        if (!valid) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_JOB_STATUS_TRANSITION,
+                    "Invalid transfer job status transition: " + currentStatus + " -> " + targetStatus
             );
         }
     }

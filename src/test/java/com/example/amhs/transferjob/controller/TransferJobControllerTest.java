@@ -116,13 +116,15 @@ class TransferJobControllerTest {
 
         Long id = objectMapper.readTree(response).path("id").asLong();
 
+        mockMvc.perform(post("/api/transfer-jobs/{id}/assign", id))
+                .andExpect(status().isOk());
+
         mockMvc.perform(patch("/api/transfer-jobs/{id}/status", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "status": "MOVING",
-                                  "reason": "Job started",
-                                  "assignedEquipmentCode": "OHT_001"
+                                  "reason": "Job started"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -173,6 +175,19 @@ class TransferJobControllerTest {
                 .getContentAsString();
 
         Long id = objectMapper.readTree(response).path("id").asLong();
+
+        mockMvc.perform(post("/api/transfer-jobs/{id}/assign", id))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/transfer-jobs/{id}/status", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "MOVING",
+                                  "reason": "Job started"
+                                }
+                                """))
+                .andExpect(status().isOk());
 
         mockMvc.perform(patch("/api/transfer-jobs/{id}/status", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -300,5 +315,36 @@ class TransferJobControllerTest {
         mockMvc.perform(post("/api/transfer-jobs/{id}/assign", id))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("NO_AVAILABLE_EQUIPMENT"));
+    }
+
+    @Test
+    @DisplayName("허용되지 않은 상태 전이는 예외 응답을 반환한다")
+    void invalidStatusTransition() throws Exception {
+        String response = mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-001",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "NORMAL"
+                                }
+                                """))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long id = objectMapper.readTree(response).path("id").asLong();
+
+        mockMvc.perform(patch("/api/transfer-jobs/{id}/status", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "MOVING",
+                                  "reason": "Job started"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_JOB_STATUS_TRANSITION"));
     }
 }

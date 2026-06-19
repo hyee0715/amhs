@@ -11,6 +11,7 @@ public enum ErrorCode {
     TRANSFER_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "Transfer job not found"),
     ROUTE_NOT_FOUND(HttpStatus.NOT_FOUND, "Route not found"),
     INVALID_JOB_STATUS(HttpStatus.BAD_REQUEST, "Invalid transfer job status"),
+    INVALID_JOB_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "Invalid transfer job status transition"),
     DUPLICATED_NODE_CODE(HttpStatus.CONFLICT, "Duplicated node code"),
     DUPLICATED_EDGE(HttpStatus.CONFLICT, "Duplicated edge"),
     DUPLICATED_EQUIPMENT_CODE(HttpStatus.CONFLICT, "Duplicated equipment code"),

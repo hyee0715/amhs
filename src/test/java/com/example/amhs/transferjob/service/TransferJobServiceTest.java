@@ -98,18 +98,19 @@ class TransferJobServiceTest {
                 new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01",
                         TransferJobPriority.NORMAL)
         );
+        transferJobService.assignTransferJob(created.id());
 
         TransferJobResponse updated = transferJobService.updateTransferJobStatus(
                 created.id(),
-                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", "OHT_001")
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
         );
 
         List<TransferJobHistoryResponse> histories = transferJobService.getTransferJobHistories(created.id());
 
         assertThat(updated.status()).isEqualTo(TransferJobStatus.MOVING);
         assertThat(updated.assignedEquipmentCode()).isEqualTo("OHT_001");
-        assertThat(histories).hasSize(2);
-        assertThat(histories.get(1).status()).isEqualTo(TransferJobStatus.MOVING);
+        assertThat(histories).hasSize(3);
+        assertThat(histories.get(2).status()).isEqualTo(TransferJobStatus.MOVING);
     }
 
     @Test
@@ -118,6 +119,11 @@ class TransferJobServiceTest {
         TransferJobResponse created = transferJobService.createTransferJob(
                 new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01",
                         TransferJobPriority.NORMAL)
+        );
+        transferJobService.assignTransferJob(created.id());
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
         );
 
         TransferJobResponse updated = transferJobService.updateTransferJobStatus(
@@ -134,6 +140,11 @@ class TransferJobServiceTest {
         TransferJobResponse created = transferJobService.createTransferJob(
                 new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01",
                         TransferJobPriority.NORMAL)
+        );
+        transferJobService.assignTransferJob(created.id());
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
         );
 
         TransferJobResponse updated = transferJobService.updateTransferJobStatus(
@@ -168,6 +179,11 @@ class TransferJobServiceTest {
         TransferJobResponse created = transferJobService.createTransferJob(
                 new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
         );
+        transferJobService.assignTransferJob(created.id());
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
+        );
 
         transferJobService.updateTransferJobStatus(
                 created.id(),
@@ -190,8 +206,8 @@ class TransferJobServiceTest {
         assertThat(retried.retryCount()).isEqualTo(1);
         assertThat(retried.path()).isEqualTo(List.of("STOCKER_01", "NODE_A", "EQP_01"));
         assertThat(retried.failureReason()).isNull();
-        assertThat(histories).hasSize(3);
-        assertThat(histories.get(2).status()).isEqualTo(TransferJobStatus.CREATED);
+        assertThat(histories).hasSize(5);
+        assertThat(histories.get(4).status()).isEqualTo(TransferJobStatus.CREATED);
     }
 
     @Test
@@ -212,6 +228,11 @@ class TransferJobServiceTest {
     void retryTransferJobWhenRouteNotFound() {
         TransferJobResponse created = transferJobService.createTransferJob(
                 new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+        transferJobService.assignTransferJob(created.id());
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
         );
 
         transferJobService.updateTransferJobStatus(
@@ -297,6 +318,10 @@ class TransferJobServiceTest {
                 new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
         );
         transferJobService.assignTransferJob(created.id());
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
+        );
 
         transferJobService.updateTransferJobStatus(
                 created.id(),
@@ -305,5 +330,46 @@ class TransferJobServiceTest {
 
         assertThat(equipmentRepository.findByCode("OHT_001").orElseThrow().getStatus())
                 .isEqualTo(EquipmentStatus.IDLE);
+    }
+
+    @Test
+    @DisplayName("허용되지 않은 상태 전이는 INVALID_JOB_STATUS_TRANSITION 예외가 발생한다")
+    void invalidStatusTransition() {
+        TransferJobResponse created = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+
+        assertThatThrownBy(() -> transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_JOB_STATUS_TRANSITION);
+    }
+
+    @Test
+    @DisplayName("완료된 Job은 다시 MOVING으로 변경할 수 없다")
+    void completedJobCannotMoveAgain() {
+        TransferJobResponse created = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+        transferJobService.assignTransferJob(created.id());
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Job started", null)
+        );
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.COMPLETED, null, null)
+        );
+
+        assertThatThrownBy(() -> transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Restart", null)
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_JOB_STATUS_TRANSITION);
     }
 }
