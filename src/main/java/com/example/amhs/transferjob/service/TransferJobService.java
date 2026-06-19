@@ -75,6 +75,13 @@ public class TransferJobService {
         return toResponse(findTransferJobById(id));
     }
 
+    public List<TransferJobResponse> getDispatchCandidates() {
+        return getPendingDispatchJobs()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional
     public TransferJobResponse updateTransferJobStatus(Long id, TransferJobStatusUpdateRequest request) {
         validateStatusRequest(request);
@@ -130,11 +137,7 @@ public class TransferJobService {
     @Transactional
     public List<TransferJobResponse> assignPendingTransferJobs() {
         List<Equipment> availableEquipments = equipmentRepository.findByStatusOrderByIdAsc(EquipmentStatus.IDLE);
-        List<TransferJob> pendingJobs = transferJobRepository.findByStatus(TransferJobStatus.CREATED)
-                .stream()
-                .filter(job -> job.getAssignedEquipment() == null)
-                .sorted(pendingJobComparator())
-                .toList();
+        List<TransferJob> pendingJobs = getPendingDispatchJobs();
 
         int assignCount = Math.min(availableEquipments.size(), pendingJobs.size());
         for (int i = 0; i < assignCount; i++) {
@@ -293,8 +296,16 @@ public class TransferJobService {
     private Comparator<TransferJob> pendingJobComparator() {
         return Comparator
                 .comparing(TransferJob::getPriority, this::comparePriority)
-                .thenComparing(TransferJob::getRetryCount)
-                .thenComparing(TransferJob::getCreatedAt);
+                .thenComparing(TransferJob::getCreatedAt)
+                .thenComparing(TransferJob::getRetryCount);
+    }
+
+    private List<TransferJob> getPendingDispatchJobs() {
+        return transferJobRepository.findByStatus(TransferJobStatus.CREATED)
+                .stream()
+                .filter(job -> job.getAssignedEquipment() == null)
+                .sorted(pendingJobComparator())
+                .toList();
     }
 
     private int comparePriority(TransferJobPriority left, TransferJobPriority right) {

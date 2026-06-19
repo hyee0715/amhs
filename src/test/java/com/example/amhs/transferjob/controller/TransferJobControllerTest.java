@@ -290,6 +290,39 @@ class TransferJobControllerTest {
     }
 
     @Test
+    @DisplayName("dispatch-candidates API가 우선순위 순서로 동작한다")
+    void getDispatchCandidates() throws Exception {
+        mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-001",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "NORMAL"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/transfer-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "carrierId": "FOUP-002",
+                                  "sourceNodeCode": "STOCKER_01",
+                                  "destinationNodeCode": "EQP_01",
+                                  "priority": "URGENT"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/transfer-jobs/dispatch-candidates"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].carrierId").value("FOUP-002"))
+                .andExpect(jsonPath("$[1].carrierId").value("FOUP-001"));
+    }
+
+    @Test
     @DisplayName("사용 가능한 장비가 없으면 assign API는 예외를 반환한다")
     void assignTransferJobWhenNoAvailableEquipment() throws Exception {
         var equipments = equipmentRepository.findAll();

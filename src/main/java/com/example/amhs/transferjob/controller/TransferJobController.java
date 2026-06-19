@@ -38,6 +38,11 @@ public class TransferJobController {
         return ResponseEntity.ok(transferJobService.getTransferJobs());
     }
 
+    @GetMapping("/dispatch-candidates")
+    public ResponseEntity<List<TransferJobResponse>> getDispatchCandidates() {
+        return ResponseEntity.ok(transferJobService.getDispatchCandidates());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<TransferJobResponse> getTransferJob(@PathVariable Long id) {
         return ResponseEntity.ok(transferJobService.getTransferJob(id));

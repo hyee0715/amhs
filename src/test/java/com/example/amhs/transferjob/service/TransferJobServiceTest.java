@@ -30,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest
 class TransferJobServiceTest {
@@ -54,6 +55,9 @@ class TransferJobServiceTest {
 
     @Autowired
     private AlertRepository alertRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -309,6 +313,46 @@ class TransferJobServiceTest {
         assertThat(assigned.get(1).id()).isEqualTo(high.id());
         assertThat(assigned.get(1).status()).isEqualTo(TransferJobStatus.ASSIGNED);
         assertThat(transferJobService.getTransferJob(normal.id()).status()).isEqualTo(TransferJobStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("배정 후보는 우선순위, 생성시각, retryCount 순으로 조회된다")
+    void getDispatchCandidates() {
+        TransferJobResponse normalOld = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-001", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+        TransferJobResponse urgent = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-002", "STOCKER_01", "EQP_01", TransferJobPriority.URGENT)
+        );
+        TransferJobResponse normalNew = transferJobService.createTransferJob(
+                new TransferJobCreateRequest("FOUP-003", "STOCKER_01", "EQP_01", TransferJobPriority.NORMAL)
+        );
+
+        jdbcTemplate.update(
+                "update transfer_jobs set created_at = ?, retry_count = ? where id = ?",
+                java.time.LocalDateTime.now().minusMinutes(5),
+                1,
+                normalOld.id()
+        );
+        jdbcTemplate.update(
+                "update transfer_jobs set created_at = ?, retry_count = ? where id = ?",
+                java.time.LocalDateTime.now().minusMinutes(3),
+                0,
+                urgent.id()
+        );
+        jdbcTemplate.update(
+                "update transfer_jobs set created_at = ?, retry_count = ? where id = ?",
+                java.time.LocalDateTime.now().minusMinutes(1),
+                0,
+                normalNew.id()
+        );
+
+        List<TransferJobResponse> candidates = transferJobService.getDispatchCandidates();
+
+        assertThat(candidates).hasSize(3);
+        assertThat(candidates.get(0).id()).isEqualTo(urgent.id());
+        assertThat(candidates.get(1).id()).isEqualTo(normalOld.id());
+        assertThat(candidates.get(2).id()).isEqualTo(normalNew.id());
     }
 
     @Test
