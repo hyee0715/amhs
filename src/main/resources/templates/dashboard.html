@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMHS Dashboard</title>
+    <style>
+        :root {
+            --bg: #f3f7fb;
+            --surface: #ffffff;
+            --surface-alt: #f8fbff;
+            --line: #d7e3f0;
+            --text: #102a43;
+            --muted: #627d98;
+            --accent: #0f766e;
+            --danger: #b42318;
+            --warning: #b54708;
+            --shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+            background: linear-gradient(180deg, #eaf2ff 0%, var(--bg) 300px);
+            color: var(--text);
+        }
+
+        .page {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 28px 18px 56px;
+        }
+
+        .hero {
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            align-items: end;
+            margin-bottom: 20px;
+        }
+
+        .hero h1 {
+            margin: 0 0 8px;
+            font-size: 2rem;
+        }
+
+        .hero p,
+        .subtext {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .links,
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .links a,
+        button,
+        .ghost-link {
+            border: 0;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font: inherit;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            color: white;
+            background: var(--accent);
+        }
+
+        .ghost-link,
+        .links a.secondary,
+        button.secondary {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        button.warn {
+            background: #fed7aa;
+            color: #9a3412;
+        }
+
+        button.danger {
+            background: #fecaca;
+            color: #991b1b;
+        }
+
+        .summary-grid,
+        .quick-grid,
+        .route-results,
+        .layout {
+            display: grid;
+            gap: 16px;
+        }
+
+        .summary-grid {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            margin-bottom: 20px;
+        }
+
+        .quick-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            margin-bottom: 20px;
+        }
+
+        .layout {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .route-results {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-top: 14px;
+        }
+
+        .card,
+        .panel {
+            background: var(--surface);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 18px;
+            box-shadow: var(--shadow);
+        }
+
+        .card {
+            padding: 18px;
+        }
+
+        .panel {
+            overflow: hidden;
+        }
+
+        .card .label {
+            color: var(--muted);
+            font-size: 0.92rem;
+            margin-bottom: 10px;
+        }
+
+        .card .value {
+            font-size: 1.9rem;
+            font-weight: 700;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--line);
+            background: var(--surface-alt);
+            gap: 12px;
+        }
+
+        .panel-header h2,
+        .panel-header h3 {
+            margin: 0;
+            font-size: 1.02rem;
+        }
+
+        .count {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .panel-body {
+            padding: 16px 18px 18px;
+        }
+
+        .message {
+            padding: 12px 14px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+
+        .message.success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .form-grid,
+        .compact-form {
+            display: grid;
+            gap: 10px;
+        }
+
+        .form-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .compact-form {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: white;
+            font: inherit;
+            color: var(--text);
+        }
+
+        label {
+            display: block;
+            font-size: 0.88rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--muted);
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .inline-form {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .inline-form select,
+        .inline-form input {
+            min-width: 110px;
+            width: auto;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #edf2f7;
+            text-align: left;
+            vertical-align: top;
+            font-size: 0.93rem;
+        }
+
+        th {
+            color: var(--muted);
+            font-weight: 600;
+            background: #fcfdff;
+            white-space: nowrap;
+        }
+
+        tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            background: #e6fffb;
+            color: var(--accent);
+        }
+
+        .badge.warn {
+            color: var(--warning);
+            background: #fff7ed;
+        }
+
+        .badge.danger {
+            color: var(--danger);
+            background: #fef3f2;
+        }
+
+        .empty {
+            padding: 22px 18px;
+            color: var(--muted);
+        }
+
+        .span-2 {
+            grid-column: span 2;
+        }
+
+        .mono {
+            font-family: "SFMono-Regular", "Menlo", monospace;
+            font-size: 0.88rem;
+        }
+
+        .route-box {
+            border: 1px dashed var(--line);
+            border-radius: 14px;
+            padding: 14px;
+            background: #fbfdff;
+        }
+
+        .section-nav {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .section-nav a {
+            text-decoration: none;
+            color: #0f4c81;
+            background: #eaf2ff;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-weight: 600;
+        }
+
+        .helper {
+            font-size: 0.82rem;
+            color: var(--muted);
+        }
+
+        @media (max-width: 1200px) {
+            .quick-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .compact-form {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 980px) {
+            .layout,
+            .form-grid,
+            .route-results {
+                grid-template-columns: 1fr;
+            }
+
+            .span-2 {
+                grid-column: auto;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hero,
+            .quick-grid,
+            .compact-form {
+                grid-template-columns: 1fr;
+                display: grid;
+            }
+
+            .hero {
+                align-items: start;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="page">
+    <section class="hero">
+        <div>
+            <h1>AMHS Operation Dashboard</h1>
+            <p>기능 확인용 간단 UI입니다. 생성, 상태 변경, 할당, 재시도, 경로 조회를 한 화면에서 처리합니다.</p>
+        </div>
+        <div class="links">
+            <a href="/swagger-ui.html" class="secondary">Swagger UI</a>
+            <a href="/api/dashboard/summary" class="secondary">Summary API</a>
+            <a href="/api/transfer-jobs">Transfer Job API</a>
+        </div>
+    </section>
+
+    <div class="message success" th:if="${successMessage}" th:text="${successMessage}">Success</div>
+    <div class="message error" th:if="${errorMessage}" th:text="${errorMessage}">Error</div>
+
+    <nav class="section-nav">
+        <a href="#create-tools">생성</a>
+        <a href="#route-tools">경로 조회</a>
+        <a href="#job-section">Job</a>
+        <a href="#history-section">Job History</a>
+        <a href="#node-section">Node</a>
+        <a href="#equipment-section">Equipment</a>
+        <a href="#edge-section">Edge</a>
+        <a href="#alert-section">Alert</a>
+    </nav>
+
+    <section class="summary-grid">
+        <article class="card"><div class="label">전체 Job</div><div class="value" th:text="${summary.totalJobs}">0</div></article>
+        <article class="card"><div class="label">생성됨</div><div class="value" th:text="${summary.createdJobs}">0</div></article>
+        <article class="card"><div class="label">이동 중</div><div class="value" th:text="${summary.movingJobs}">0</div></article>
+        <article class="card"><div class="label">완료</div><div class="value" th:text="${summary.completedJobs}">0</div></article>
+        <article class="card"><div class="label">실패</div><div class="value" th:text="${summary.failedJobs}">0</div></article>
+        <article class="card"><div class="label">성공률</div><div class="value" th:text="${#numbers.formatDecimal(summary.successRate, 1, 1)} + '%'">0.0%</div></article>
+        <article class="card"><div class="label">평균 예상 시간</div><div class="value" th:text="${#numbers.formatDecimal(summary.averageEstimatedTimeSeconds, 1, 1)} + 's'">0.0s</div></article>
+        <article class="card"><div class="label">Blocked / Error</div><div class="value" th:text="|N ${summary.blockedNodeCount} / E ${summary.blockedEdgeCount} / EQ ${summary.equipmentErrorCount}|">0</div></article>
+    </section>
+
+    <section class="quick-grid" id="create-tools">
+        <article class="panel">
+            <div class="panel-header"><h3>Node 등록</h3></div>
+            <div class="panel-body">
+                <form method="post" action="/nodes" class="form-grid">
+                    <div><label for="node-code">Code</label><input id="node-code" name="code" required></div>
+                    <div><label for="node-name">Name</label><input id="node-name" name="name" required></div>
+                    <div><label for="node-type">Type</label><select id="node-type" name="type"><option th:each="type : ${nodeTypes}" th:value="${type}" th:text="${type}"></option></select></div>
+                    <div class="actions"><button type="submit">등록</button></div>
+                </form>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="panel-header"><h3>Equipment 등록</h3></div>
+            <div class="panel-body">
+                <form method="post" action="/equipments" class="form-grid">
+                    <div><label for="equipment-code">Code</label><input id="equipment-code" name="code" required></div>
+                    <div><label for="equipment-name">Name</label><input id="equipment-name" name="name" required></div>
+                    <div><label for="equipment-type">Type</label><select id="equipment-type" name="type"><option th:each="type : ${equipmentTypes}" th:value="${type}" th:text="${type}"></option></select></div>
+                    <div class="actions"><button type="submit">등록</button></div>
+                </form>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="panel-header"><h3>Edge 등록</h3></div>
+            <div class="panel-body">
+                <form method="post" action="/edges" class="compact-form">
+                    <div><label for="fromNodeCode">From</label><select id="fromNodeCode" name="fromNodeCode"><option th:each="node : ${nodes}" th:value="${node.code}" th:text="${node.code}"></option></select></div>
+                    <div><label for="toNodeCode">To</label><select id="toNodeCode" name="toNodeCode"><option th:each="node : ${nodes}" th:value="${node.code}" th:text="${node.code}"></option></select></div>
+                    <div><label for="distance">Distance</label><input id="distance" type="number" name="distance" min="1" value="100" required></div>
+                    <div><label for="estimatedTimeSeconds">ETA(s)</label><input id="estimatedTimeSeconds" type="number" name="estimatedTimeSeconds" min="1" value="30" required></div>
+                    <div><label for="congestionLevel">Congestion</label><input id="congestionLevel" type="number" name="congestionLevel" min="0" max="100" value="0" required></div>
+                    <div><label for="bidirectional">Bidirectional</label><select id="bidirectional" name="bidirectional"><option value="true">true</option><option value="false" selected>false</option></select></div>
+                    <div class="actions"><button type="submit">등록</button></div>
+                </form>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="panel-header"><h3>Transfer Job 생성</h3></div>
+            <div class="panel-body">
+                <form method="post" action="/transfer-jobs" class="compact-form">
+                    <div><label for="carrierId">Carrier ID</label><input id="carrierId" name="carrierId" required></div>
+                    <div><label for="sourceNodeCode">Source</label><select id="sourceNodeCode" name="sourceNodeCode"><option th:each="node : ${nodes}" th:value="${node.code}" th:text="${node.code}"></option></select></div>
+                    <div><label for="destinationNodeCode">Destination</label><select id="destinationNodeCode" name="destinationNodeCode"><option th:each="node : ${nodes}" th:value="${node.code}" th:text="${node.code}"></option></select></div>
+                    <div><label for="priority">Priority</label><select id="priority" name="priority"><option th:each="priority : ${jobPriorities}" th:value="${priority}" th:text="${priority}"></option></select></div>
+                    <div class="actions"><button type="submit">생성</button></div>
+                </form>
+            </div>
+        </article>
+    </section>
+
+    <section class="layout">
+        <article class="panel span-2" id="route-tools">
+            <div class="panel-header">
+                <h2>Route 조회</h2>
+                <span class="count">BFS / Dijkstra 비교</span>
+            </div>
+            <div class="panel-body">
+                <form method="get" action="/dashboard" class="compact-form">
+                    <div><label for="route-source">Source</label><select id="route-source" name="source"><option value="">선택</option><option th:each="node : ${nodes}" th:value="${node.code}" th:text="${node.code}" th:selected="${node.code == selectedSource}"></option></select></div>
+                    <div><label for="route-destination">Destination</label><select id="route-destination" name="destination"><option value="">선택</option><option th:each="node : ${nodes}" th:value="${node.code}" th:text="${node.code}" th:selected="${node.code == selectedDestination}"></option></select></div>
+                    <div><label for="strategy">Strategy</label><select id="strategy" name="strategy"><option th:each="strategyItem : ${routeStrategies}" th:value="${strategyItem}" th:text="${strategyItem}" th:selected="${strategyItem == selectedStrategy}"></option></select></div>
+                    <div class="actions">
+                        <button type="submit">경로 조회</button>
+                        <a class="ghost-link" href="/dashboard">초기화</a>
+                    </div>
+                </form>
+                <div class="route-results" th:if="${bfsRouteResult || dijkstraRouteResult || bfsRouteError || dijkstraRouteError}">
+                    <div class="route-box">
+                        <div><strong>BFS</strong></div>
+                        <div class="helper">최단 hop 기준</div>
+                        <div th:if="${bfsRouteResult}">
+                            <div><strong>Path:</strong> <span class="mono" th:text="${bfsRouteResult.path}">[A, B]</span></div>
+                            <div><strong>Total Distance:</strong> <span th:text="${bfsRouteResult.totalDistance}">0</span></div>
+                            <div><strong>Total ETA:</strong> <span th:text="${bfsRouteResult.totalEstimatedTimeSeconds} + 's'">0s</span></div>
+                        </div>
+                        <div class="message error" th:if="${bfsRouteError}" th:text="${bfsRouteError}" style="margin-top:12px; margin-bottom:0;">BFS error</div>
+                    </div>
+                    <div class="route-box">
+                        <div><strong>Dijkstra</strong></div>
+                        <div class="helper">전략: <span th:text="${selectedStrategy}">TIME</span></div>
+                        <div th:if="${dijkstraRouteResult}">
+                            <div><strong>Algorithm:</strong> <span th:text="${dijkstraRouteResult.algorithm}">DIJKSTRA_TIME</span></div>
+                            <div><strong>Path:</strong> <span class="mono" th:text="${dijkstraRouteResult.path}">[A, B]</span></div>
+                            <div><strong>Total Distance:</strong> <span th:text="${dijkstraRouteResult.totalDistance}">0</span></div>
+                            <div><strong>Total ETA:</strong> <span th:text="${dijkstraRouteResult.totalEstimatedTimeSeconds} + 's'">0s</span></div>
+                        </div>
+                        <div class="message error" th:if="${dijkstraRouteError}" th:text="${dijkstraRouteError}" style="margin-top:12px; margin-bottom:0;">Dijkstra error</div>
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <article class="panel" id="node-section">
+            <div class="panel-header"><h2>Nodes</h2><span class="count" th:text="${#lists.size(nodes)} + ' items'">0 items</span></div>
+            <div class="table-wrap" th:if="${!#lists.isEmpty(nodes)}">
+                <table>
+                    <thead><tr><th>ID</th><th>Code</th><th>Name</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody>
+                    <tr th:each="node : ${nodes}">
+                        <td th:text="${node.id}">1</td>
+                        <td class="mono" th:text="${node.code}">NODE_A</td>
+                        <td th:text="${node.name}">Node A</td>
+                        <td th:text="${node.type}">OHT_NODE</td>
+                        <td><span class="badge" th:classappend="${node.status.name() == 'BLOCKED'} ? ' danger' : ''" th:text="${node.status}">AVAILABLE</span></td>
+                        <td>
+                            <form class="inline-form" method="post" th:action="@{/nodes/{id}/status(id=${node.id})}">
+                                <select name="status"><option th:each="status : ${nodeStatuses}" th:value="${status}" th:text="${status}" th:selected="${status == node.status}"></option></select>
+                                <button type="submit">변경</button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(nodes)}">등록된 노드가 없습니다.</div>
+        </article>
+
+        <article class="panel" id="equipment-section">
+            <div class="panel-header"><h2>Equipments</h2><span class="count" th:text="${#lists.size(equipments)} + ' items'">0 items</span></div>
+            <div class="table-wrap" th:if="${!#lists.isEmpty(equipments)}">
+                <table>
+                    <thead><tr><th>ID</th><th>Code</th><th>Name</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody>
+                    <tr th:each="equipment : ${equipments}">
+                        <td th:text="${equipment.id}">1</td>
+                        <td class="mono" th:text="${equipment.code}">OHT_001</td>
+                        <td th:text="${equipment.name}">OHT 001</td>
+                        <td th:text="${equipment.type}">OHT</td>
+                        <td><span class="badge" th:classappend="${equipment.status.name() == 'ERROR'} ? ' danger' : (${equipment.status.name() == 'MOVING'} ? ' warn' : '')" th:text="${equipment.status}">IDLE</span></td>
+                        <td>
+                            <form class="inline-form" method="post" th:action="@{/equipments/{id}/status(id=${equipment.id})}">
+                                <select name="status"><option th:each="status : ${equipmentStatuses}" th:value="${status}" th:text="${status}" th:selected="${status == equipment.status}"></option></select>
+                                <button type="submit">변경</button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(equipments)}">등록된 장비가 없습니다.</div>
+        </article>
+
+        <article class="panel span-2" id="job-section">
+            <div class="panel-header">
+                <h2>Transfer Jobs</h2>
+                <div class="toolbar">
+                    <span class="count" th:text="${#lists.size(transferJobs)} + ' items'">0 items</span>
+                    <form method="post" action="/transfer-jobs/assign-pending">
+                        <button type="submit">대기 Job 일괄 할당</button>
+                    </form>
+                </div>
+            </div>
+            <div class="table-wrap" th:if="${!#lists.isEmpty(transferJobs)}">
+                <table>
+                    <thead><tr><th>ID</th><th>Carrier</th><th>Route</th><th>Equipment</th><th>Status</th><th>Priority</th><th>ETA</th><th>Path</th><th>Action</th></tr></thead>
+                    <tbody>
+                    <tr th:each="job : ${transferJobs}">
+                        <td th:text="${job.id}">1</td>
+                        <td class="mono" th:text="${job.carrierId}">CARRIER-01</td>
+                        <td th:text="${job.sourceNodeCode + ' -> ' + job.destinationNodeCode}">A -> B</td>
+                        <td th:text="${job.assignedEquipmentCode != null ? job.assignedEquipmentCode : '-'}">-</td>
+                        <td><span class="badge" th:classappend="${job.status.name() == 'FAILED'} ? ' danger' : (${job.status.name() == 'MOVING' || job.status.name() == 'ASSIGNED'} ? ' warn' : '')" th:text="${job.status}">CREATED</span></td>
+                        <td th:text="${job.priority}">NORMAL</td>
+                        <td th:text="${job.estimatedTimeSeconds} + 's'">30s</td>
+                        <td class="mono" th:text="${job.path}">[A, B]</td>
+                        <td>
+                            <div class="actions">
+                                <a class="ghost-link" th:href="|/dashboard?historyJobId=${job.id}#history-section|">이력 보기</a>
+                                <form method="post" th:action="@{/transfer-jobs/{id}/assign(id=${job.id})}">
+                                    <button type="submit">자동 할당</button>
+                                </form>
+                                <form method="post" th:action="@{/transfer-jobs/{id}/retry(id=${job.id})}">
+                                    <button type="submit" class="warn">재시도</button>
+                                </form>
+                            </div>
+                            <form class="inline-form" method="post" th:action="@{/transfer-jobs/{id}/status(id=${job.id})}" style="margin-top:8px;">
+                                <select name="status"><option th:each="status : ${jobStatuses}" th:value="${status}" th:text="${status}" th:selected="${status == job.status}"></option></select>
+                                <input name="assignedEquipmentCode" placeholder="equipment code">
+                                <input name="reason" placeholder="reason">
+                                <button type="submit">상태 변경</button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(transferJobs)}">생성된 Transfer Job 이 없습니다.</div>
+        </article>
+
+        <article class="panel span-2" id="history-section">
+            <div class="panel-header">
+                <h2>Transfer Job History</h2>
+                <div class="toolbar">
+                    <span class="count" th:text="${selectedHistoryJobId != null ? 'job #' + selectedHistoryJobId : 'job 선택 필요'}">job 선택 필요</span>
+                    <form method="get" action="/dashboard" class="inline-form">
+                        <select name="historyJobId">
+                            <option value="">Job 선택</option>
+                            <option th:each="job : ${transferJobs}" th:value="${job.id}" th:text="|#${job.id} ${job.carrierId}|"
+                                    th:selected="${selectedHistoryJobId != null && selectedHistoryJobId == job.id}"></option>
+                        </select>
+                        <button type="submit" class="secondary">조회</button>
+                    </form>
+                </div>
+            </div>
+            <div class="table-wrap" th:if="${jobHistories != null}">
+                <table>
+                    <thead><tr><th>ID</th><th>Status</th><th>Equipment</th><th>Reason</th><th>Path Snapshot</th><th>Created At</th></tr></thead>
+                    <tbody>
+                    <tr th:each="history : ${jobHistories}">
+                        <td th:text="${history.id}">1</td>
+                        <td><span class="badge" th:classappend="${history.status.name() == 'FAILED'} ? ' danger' : (${history.status.name() == 'ASSIGNED' || history.status.name() == 'MOVING'} ? ' warn' : '')" th:text="${history.status}">CREATED</span></td>
+                        <td th:text="${history.assignedEquipmentCode != null ? history.assignedEquipmentCode : '-'}">-</td>
+                        <td th:text="${history.reason != null ? history.reason : '-'}">-</td>
+                        <td class="mono" th:text="${history.pathSnapshot}">[A, B]</td>
+                        <td th:text="${history.createdAt}">2026-06-17T12:00</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="message error" th:if="${historyError}" th:text="${historyError}" style="margin:16px 18px 0;">History error</div>
+            <div class="empty" th:if="${selectedHistoryJobId == null}">Transfer Job 목록의 `이력 보기` 또는 위 선택창으로 조회하세요.</div>
+            <div class="empty" th:if="${selectedHistoryJobId != null && jobHistories != null && #lists.isEmpty(jobHistories)}">이력이 없습니다.</div>
+        </article>
+
+        <article class="panel" id="edge-section">
+            <div class="panel-header"><h2>Edges</h2><span class="count" th:text="${#lists.size(edges)} + ' items'">0 items</span></div>
+            <div class="table-wrap" th:if="${!#lists.isEmpty(edges)}">
+                <table>
+                    <thead><tr><th>ID</th><th>Edge</th><th>Distance</th><th>ETA</th><th>Congestion</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody>
+                    <tr th:each="edge : ${edges}">
+                        <td th:text="${edge.id}">1</td>
+                        <td class="mono" th:text="${edge.fromNodeCode + ' -> ' + edge.toNodeCode}">A -> B</td>
+                        <td th:text="${edge.distance}">100</td>
+                        <td th:text="${edge.estimatedTimeSeconds} + 's'">30s</td>
+                        <td th:text="${edge.congestionLevel}">0</td>
+                        <td><span class="badge" th:classappend="${edge.status.name() == 'BLOCKED'} ? ' danger' : ''" th:text="${edge.status}">AVAILABLE</span></td>
+                        <td>
+                            <form class="inline-form" method="post" th:action="@{/edges/{id}/status(id=${edge.id})}">
+                                <select name="status"><option th:each="status : ${edgeStatuses}" th:value="${status}" th:text="${status}" th:selected="${status == edge.status}"></option></select>
+                                <button type="submit">상태 변경</button>
+                            </form>
+                            <form class="inline-form" method="post" th:action="@{/edges/{id}/congestion(id=${edge.id})}" style="margin-top:8px;">
+                                <input type="number" name="congestionLevel" min="0" max="100" th:value="${edge.congestionLevel}">
+                                <button type="submit" class="secondary">혼잡도 변경</button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(edges)}">등록된 Edge 가 없습니다.</div>
+        </article>
+
+        <article class="panel" id="alert-section">
+            <div class="panel-header"><h2>Alerts</h2><span class="count" th:text="${#lists.size(alerts)} + ' items'">0 items</span></div>
+            <div class="table-wrap" th:if="${!#lists.isEmpty(alerts)}">
+                <table>
+                    <thead><tr><th>ID</th><th>Type</th><th>Status</th><th>Job</th><th>Message</th><th>Action</th></tr></thead>
+                    <tbody>
+                    <tr th:each="alert : ${alerts}">
+                        <td th:text="${alert.id}">1</td>
+                        <td th:text="${alert.type}">STUCK_JOB</td>
+                        <td><span class="badge" th:classappend="${alert.status.name() == 'OPEN'} ? ' danger' : ''" th:text="${alert.status}">OPEN</span></td>
+                        <td th:text="${alert.transferJobId != null ? alert.transferJobId : '-'}">1</td>
+                        <td th:text="${alert.message}">message</td>
+                        <td>
+                            <form method="post" th:action="@{/alerts/{id}/resolve(id=${alert.id})}">
+                                <button type="submit" class="secondary">해제</button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(alerts)}">발생한 알림이 없습니다.</div>
+        </article>
+    </section>
+</main>
+</body>
+</html>
