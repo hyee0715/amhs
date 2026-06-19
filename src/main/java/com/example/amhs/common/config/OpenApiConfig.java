@@ -14,7 +14,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("AMHS API")
-                        .description("AMHS transfer job routing and state management API")
+                        .description("AMHS transfer job routing, assignment, alert, dashboard API")
                         .version("v0.0.1")
                         .contact(new Contact().name("hyemin")));
     }
