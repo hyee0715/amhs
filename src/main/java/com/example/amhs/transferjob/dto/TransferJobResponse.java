@@ -20,8 +20,10 @@ public record TransferJobResponse(
         String failureReason,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
+        LocalDateTime startedAt,
         LocalDateTime completedAt,
-        LocalDateTime failedAt
+        LocalDateTime failedAt,
+        Integer actualTransferTimeSeconds
 ) {
     public static TransferJobResponse from(TransferJob transferJob, List<String> path) {
         return new TransferJobResponse(
@@ -38,8 +40,10 @@ public record TransferJobResponse(
                 transferJob.getFailureReason(),
                 transferJob.getCreatedAt(),
                 transferJob.getUpdatedAt(),
+                transferJob.getStartedAt(),
                 transferJob.getCompletedAt(),
-                transferJob.getFailedAt()
+                transferJob.getFailedAt(),
+                transferJob.getActualTransferTimeSeconds()
         );
     }
 }

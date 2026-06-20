@@ -14,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -65,9 +66,13 @@ public class TransferJob extends BaseTimeEntity {
     @Column(length = 500)
     private String failureReason;
 
+    private LocalDateTime startedAt;
+
     private LocalDateTime completedAt;
 
     private LocalDateTime failedAt;
+
+    private Integer actualTransferTimeSeconds;
 
     @Builder
     private TransferJob(
@@ -81,8 +86,10 @@ public class TransferJob extends BaseTimeEntity {
             int estimatedTimeSeconds,
             int retryCount,
             String failureReason,
+            LocalDateTime startedAt,
             LocalDateTime completedAt,
-            LocalDateTime failedAt
+            LocalDateTime failedAt,
+            Integer actualTransferTimeSeconds
     ) {
         this.carrierId = carrierId;
         this.sourceNode = sourceNode;
@@ -94,8 +101,10 @@ public class TransferJob extends BaseTimeEntity {
         this.estimatedTimeSeconds = estimatedTimeSeconds;
         this.retryCount = retryCount;
         this.failureReason = failureReason;
+        this.startedAt = startedAt;
         this.completedAt = completedAt;
         this.failedAt = failedAt;
+        this.actualTransferTimeSeconds = actualTransferTimeSeconds;
     }
 
     public static TransferJob create(
@@ -124,17 +133,37 @@ public class TransferJob extends BaseTimeEntity {
             this.assignedEquipment = assignedEquipment;
         }
 
+        LocalDateTime now = LocalDateTime.now();
+        if (status == TransferJobStatus.MOVING) {
+            this.startedAt = now;
+            this.failureReason = null;
+            this.completedAt = null;
+            this.failedAt = null;
+            this.actualTransferTimeSeconds = null;
+            return;
+        }
+
         if (status == TransferJobStatus.COMPLETED) {
             this.failureReason = null;
-            this.completedAt = LocalDateTime.now();
+            this.completedAt = now;
             this.failedAt = null;
-        } else if (status == TransferJobStatus.FAILED) {
+            this.actualTransferTimeSeconds = startedAt != null
+                    ? Math.toIntExact(Duration.between(startedAt, completedAt).getSeconds())
+                    : null;
+            return;
+        }
+
+        if (status == TransferJobStatus.FAILED) {
             this.failureReason = failureReason;
             this.completedAt = null;
-            this.failedAt = LocalDateTime.now();
-        } else {
-            this.failedAt = null;
+            this.failedAt = now;
+            this.actualTransferTimeSeconds = null;
+            return;
         }
+
+        this.failedAt = null;
+        this.completedAt = null;
+        this.actualTransferTimeSeconds = null;
     }
 
     public void retry(String path, int estimatedTimeSeconds) {
@@ -144,8 +173,10 @@ public class TransferJob extends BaseTimeEntity {
         this.retryCount += 1;
         this.assignedEquipment = null;
         this.failureReason = null;
+        this.startedAt = null;
         this.completedAt = null;
         this.failedAt = null;
+        this.actualTransferTimeSeconds = null;
     }
 
     public void assign(Equipment equipment) {

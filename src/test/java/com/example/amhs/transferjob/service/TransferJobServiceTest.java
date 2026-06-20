@@ -135,7 +135,9 @@ class TransferJobServiceTest {
                 new TransferJobStatusUpdateRequest(TransferJobStatus.COMPLETED, null, null)
         );
 
+        assertThat(transferJobService.getTransferJob(created.id()).startedAt()).isNotNull();
         assertThat(updated.completedAt()).isNotNull();
+        assertThat(updated.actualTransferTimeSeconds()).isNotNull();
     }
 
     @Test

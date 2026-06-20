@@ -25,4 +25,7 @@ public interface TransferJobRepository extends JpaRepository<TransferJob, Long> 
 
     @EntityGraph(attributePaths = {"sourceNode", "destinationNode", "assignedEquipment"})
     List<TransferJob> findByStatus(TransferJobStatus status);
+
+    @EntityGraph(attributePaths = {"sourceNode", "destinationNode", "assignedEquipment"})
+    List<TransferJob> findByStatusAndActualTransferTimeSecondsIsNotNull(TransferJobStatus status);
 }
