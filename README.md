@@ -150,8 +150,10 @@ Transfer Job의 상태 변경 이력을 저장합니다.
 - `failure_reason`
 - `created_at`
 - `updated_at`
+- `started_at`
 - `completed_at`
 - `failed_at`
+- `actual_transfer_time_seconds`
 
 ### `transfer_job_histories`
 
@@ -401,6 +403,203 @@ Scheduler가 주기적으로 운영 이상 징후를 감지합니다.
 
 - `GET /api/dashboard/summary`
 
+## Analytics - AMHS 운영 데이터 분석
+
+이 프로젝트는 AMHS 반송 Job을 단순히 생성하고 상태를 변경하는 데 그치지 않고, 완료/실패 Job 데이터를 기반으로 운영 성능을 분석할 수 있도록 확장했습니다. 평균, 표준편차, 변동계수, 사분위수, IQR, 파레토 분석, 이동평균 개념을 적용하여 이상 지연 Job, 불안정 경로, 주요 실패 원인, 시간대별 지연 추세를 확인할 수 있도록 구현했습니다.
+
+### Analytics 기능을 추가한 이유
+
+반송 시스템은 정상 동작 여부만 확인하는 것으로는 운영 품질을 충분히 설명하기 어렵습니다.
+
+- 어떤 Job이 비정상적으로 오래 걸렸는지
+- 특정 경로가 평균적으로는 빨라도 실제 운행 편차가 큰지
+- 실패 원인 중 어떤 이슈가 가장 큰 비중을 차지하는지
+- 특정 시간대에 지연이 집중되는지
+
+위 정보를 운영 데이터에서 바로 분석할 수 있어야 장애 대응, 경로 개선, 장비 운영 전략 수립에 활용할 수 있습니다.
+
+### 프로젝트에서 사용한 통계 / 분석 개념
+
+- 평균: 경로별 대표 반송 시간 계산
+- 표준편차: 경로별 시간 분산 정도 계산
+- 변동계수(CV): 평균 대비 변동성 비교
+- 사분위수(Q1, Q3): 반송 시간 분포의 기준점 파악
+- IQR: 이상 지연 Job 탐지 기준 계산
+- 파레토 분석: 실패 원인별 집중도 확인
+- 이동평균: 시간대별 지연률 추세 완화 및 흐름 확인
+
+### 1. IQR 기반 이상 지연 Job 탐지
+
+완료된 Job의 `actualTransferTimeSeconds`를 기준으로 사분위수와 IQR을 계산하고, `Upper Fence = Q3 + 1.5 * IQR`보다 큰 Job을 이상 지연 Job으로 분류합니다.
+
+- 분석 대상: `status = COMPLETED`, `actualTransferTimeSeconds != null`
+- 반환 값: `jobCount`, `q1`, `q3`, `iqr`, `outlierThreshold`, `outlierCount`, `outlierJobs`
+- 데이터가 4건 미만이면 IQR 계산 신뢰도가 낮다고 보고 핵심 통계값은 `null`로 반환합니다.
+
+응답 예시:
+
+```json
+{
+  "jobCount": 20,
+  "q1": 42.0,
+  "q3": 95.0,
+  "iqr": 53.0,
+  "outlierThreshold": 174.5,
+  "outlierCount": 2,
+  "outlierJobs": [
+    {
+      "jobId": 12,
+      "carrierId": "FOUP-012",
+      "sourceNodeCode": "STOCKER_01",
+      "destinationNodeCode": "EQP_02",
+      "actualTransferTimeSeconds": 210,
+      "path": ["STOCKER_01", "NODE_A", "NODE_D", "EQP_02"],
+      "completedAt": "2026-06-18T10:30:00"
+    }
+  ]
+}
+```
+
+### 2. 경로별 평균 / 표준편차 / 변동계수 기반 불안정 경로 탐지
+
+동일 경로로 완료된 Job들을 묶어 평균 반송 시간, 표준편차, 변동계수(CV)를 계산하고 경로 안정성을 분류합니다.
+
+- 분석 대상: `status = COMPLETED`, `actualTransferTimeSeconds != null`, `path != null`
+- 그룹 기준: `path`
+- 안정성 분류:
+- `CV < 0.15` -> `STABLE`
+- `0.15 <= CV < 0.35` -> `MODERATE`
+- `CV >= 0.35` -> `UNSTABLE`
+
+평균 시간이 짧더라도 편차가 큰 경로는 운영상 불안정한 경로로 판단할 수 있도록 설계했습니다.
+
+응답 예시:
+
+```json
+[
+  {
+    "route": ["STOCKER_01", "NODE_A", "EQP_01"],
+    "jobCount": 20,
+    "averageTransferTimeSeconds": 80.5,
+    "standardDeviation": 5.2,
+    "coefficientOfVariation": 0.06,
+    "minTransferTimeSeconds": 72,
+    "maxTransferTimeSeconds": 91,
+    "stability": "STABLE"
+  },
+  {
+    "route": ["STOCKER_01", "NODE_D", "EQP_02"],
+    "jobCount": 18,
+    "averageTransferTimeSeconds": 82.1,
+    "standardDeviation": 39.8,
+    "coefficientOfVariation": 0.48,
+    "minTransferTimeSeconds": 50,
+    "maxTransferTimeSeconds": 180,
+    "stability": "UNSTABLE"
+  }
+]
+```
+
+### 3. 실패 원인 파레토 분석
+
+`FAILED` 상태 Job을 `failureReason` 기준으로 집계해 count, ratio, cumulativeRatio를 계산합니다.
+
+- 분석 대상: `status = FAILED`, `failureReason != null`
+- 정렬 기준: `count` 내림차순, 같으면 `failureReason` 오름차순
+- 목적: 어떤 실패 원인이 전체 실패의 대부분을 차지하는지 빠르게 파악
+
+응답 예시:
+
+```json
+[
+  {
+    "failureReason": "EQUIPMENT_ERROR",
+    "count": 12,
+    "ratio": 40.0,
+    "cumulativeRatio": 40.0
+  },
+  {
+    "failureReason": "NODE_BLOCKED",
+    "count": 8,
+    "ratio": 26.7,
+    "cumulativeRatio": 66.7
+  },
+  {
+    "failureReason": "EDGE_BLOCKED",
+    "count": 5,
+    "ratio": 16.7,
+    "cumulativeRatio": 83.4
+  }
+]
+```
+
+### 4. 시간대별 지연률 + 이동평균 추세 분석
+
+완료된 Job을 `completedAt`의 hour 기준으로 그룹화하고, `actualTransferTimeSeconds > estimatedTimeSeconds`인 경우를 지연으로 판단해 시간대별 지연률과 3시간 이동평균을 계산합니다.
+
+- 분석 대상: `status = COMPLETED`, `completedAt != null`, `actualTransferTimeSeconds != null`
+- 그룹 기준: `completedAt.hour`
+- 지연 기준: `actualTransferTimeSeconds > estimatedTimeSeconds`
+- 이동평균: 최근 3개 시간대의 `delayRate` 평균
+
+시간대별 순간 값뿐 아니라 최근 흐름을 같이 보여주기 때문에 추세성 분석에 유용합니다.
+
+응답 예시:
+
+```json
+[
+  {
+    "hour": 9,
+    "totalCompletedJobs": 12,
+    "delayedJobs": 3,
+    "delayRate": 25.0,
+    "movingAverageDelayRate": 18.3
+  },
+  {
+    "hour": 10,
+    "totalCompletedJobs": 8,
+    "delayedJobs": 2,
+    "delayRate": 25.0,
+    "movingAverageDelayRate": 21.7
+  },
+  {
+    "hour": 11,
+    "totalCompletedJobs": 10,
+    "delayedJobs": 5,
+    "delayRate": 50.0,
+    "movingAverageDelayRate": 33.3
+  }
+]
+```
+
+### Analytics API 목록
+
+- `GET /api/analytics/transfer-time/outliers`
+- `GET /api/analytics/routes/stability`
+- `GET /api/analytics/failures/pareto`
+- `GET /api/analytics/delays/hourly-trend`
+
+### 추후 HTML Dashboard 확장 계획
+
+현재 Analytics는 REST API와 응답 DTO 중심으로 구성되어 있고, 추후 같은 `AnalyticsService`를 재사용해서 다음 화면으로 확장할 수 있습니다.
+
+- Analytics Dashboard
+- 이상 지연 Job 목록 화면
+- 경로별 안정성 분석 화면
+- 실패 원인 파레토 차트 화면
+- 시간대별 지연 추세 차트 화면
+
+즉, 이번 구현은 API만 추가한 것이 아니라 이후 서버 렌더링 View나 프론트엔드 대시보드로 확장 가능한 분석 계층까지 포함한 구조입니다.
+
+### 포트폴리오 어필 포인트
+
+- 단순 CRUD를 넘어서 운영 데이터 분석까지 확장한 백엔드 설계 경험을 보여줄 수 있습니다.
+- 도메인 상태 관리와 통계 분석 로직을 분리해 서비스 계층 재사용성을 확보했습니다.
+- API 응답을 HTML Dashboard, 차트, 보고서 용도로 재사용하기 쉽게 DTO 중심으로 설계했습니다.
+- 실제 운영 관점에서 의미 있는 질문을 코드로 풀었습니다.
+  예: 어떤 Job이 이상 지연인지, 어떤 경로가 불안정한지, 어떤 실패 원인이 핵심인지, 어느 시간대에 지연이 몰리는지
+- 데이터 분석 학습 과정에서 익힌 개념을 서비스 도메인에 직접 적용한 사례로 설명할 수 있습니다.
+
 ## 테스트 방법
 
 전체 테스트 실행:
@@ -426,6 +625,10 @@ Scheduler가 주기적으로 운영 이상 징후를 감지합니다.
 - 상태 전이 규칙 검증
 - Alert 감지 및 resolve 검증
 - Dashboard summary 집계 검증
+- IQR 기반 이상 지연 Job 탐지
+- 경로별 평균 / 표준편차 / 변동계수 기반 안정성 분류
+- 실패 원인 파레토 분석
+- 시간대별 지연률 및 3시간 이동평균 계산
 
 ## 구현 포인트
 
