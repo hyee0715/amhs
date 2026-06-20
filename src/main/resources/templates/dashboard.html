@@ -94,6 +94,7 @@
 
         .summary-grid,
         .quick-grid,
+        .analytics-grid,
         .route-results,
         .layout {
             display: grid;
@@ -112,6 +113,11 @@
 
         .layout {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .analytics-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-bottom: 20px;
         }
 
         .route-results {
@@ -333,9 +339,38 @@
             color: var(--muted);
         }
 
+        .metric-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .mini-stat {
+            padding: 12px;
+            background: #fbfdff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+        }
+
+        .mini-stat .label {
+            color: var(--muted);
+            font-size: 0.8rem;
+            margin-bottom: 6px;
+        }
+
+        .mini-stat .value {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
         @media (max-width: 1200px) {
             .quick-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .analytics-grid {
+                grid-template-columns: 1fr;
             }
 
             .compact-form {
@@ -345,6 +380,7 @@
 
         @media (max-width: 980px) {
             .layout,
+            .metric-row,
             .form-grid,
             .route-results {
                 grid-template-columns: 1fr;
@@ -389,7 +425,9 @@
     <nav class="section-nav">
         <a href="#create-tools">생성</a>
         <a href="#route-tools">경로 조회</a>
+        <a href="#analytics-section">Analytics</a>
         <a href="#job-section">Job</a>
+        <a href="#dispatch-section">Dispatch</a>
         <a href="#history-section">Job History</a>
         <a href="#node-section">Node</a>
         <a href="#equipment-section">Equipment</a>
@@ -459,6 +497,123 @@
                     <div class="actions"><button type="submit">생성</button></div>
                 </form>
             </div>
+        </article>
+    </section>
+
+    <section class="analytics-grid" id="analytics-section">
+        <article class="panel">
+            <div class="panel-header">
+                <h2>Transfer Time Outliers</h2>
+                <div class="toolbar">
+                    <span class="count" th:text="${transferTimeOutliers.outlierCount} + ' outliers'">0 outliers</span>
+                    <a class="ghost-link" href="/api/analytics/transfer-time/outliers">API</a>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="metric-row">
+                    <div class="mini-stat"><div class="label">Job Count</div><div class="value" th:text="${transferTimeOutliers.jobCount}">0</div></div>
+                    <div class="mini-stat"><div class="label">Q1 / Q3</div><div class="value" th:text="${transferTimeOutliers.q1 != null ? transferTimeOutliers.q1 + ' / ' + transferTimeOutliers.q3 : '-'}">-</div></div>
+                    <div class="mini-stat"><div class="label">Upper Fence</div><div class="value" th:text="${transferTimeOutliers.outlierThreshold != null ? transferTimeOutliers.outlierThreshold : '-'}">-</div></div>
+                </div>
+                <div class="table-wrap" th:if="${!#lists.isEmpty(transferTimeOutliers.outlierJobs)}">
+                    <table>
+                        <thead><tr><th>Job</th><th>Route</th><th>Actual</th><th>Completed At</th></tr></thead>
+                        <tbody>
+                        <tr th:each="outlier : ${transferTimeOutliers.outlierJobs}">
+                            <td class="mono" th:text="${outlier.carrierId}">FOUP-001</td>
+                            <td th:text="${outlier.sourceNodeCode + ' -> ' + outlier.destinationNodeCode}">A -> B</td>
+                            <td th:text="${outlier.actualTransferTimeSeconds} + 's'">100s</td>
+                            <td th:text="${outlier.completedAt}">2026-06-18T10:30</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${#lists.isEmpty(transferTimeOutliers.outlierJobs)}">현재 기준으로 이상 지연 Job 이 없습니다.</div>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="panel-header">
+                <h2>Failure Pareto</h2>
+                <div class="toolbar">
+                    <span class="count" th:text="${#lists.size(failurePareto)} + ' reasons'">0 reasons</span>
+                    <a class="ghost-link" href="/api/analytics/failures/pareto">API</a>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="table-wrap" th:if="${!#lists.isEmpty(failurePareto)}">
+                    <table>
+                        <thead><tr><th>Failure Reason</th><th>Count</th><th>Ratio</th><th>Cumulative</th></tr></thead>
+                        <tbody>
+                        <tr th:each="failure : ${failurePareto}">
+                            <td th:text="${failure.failureReason}">EQUIPMENT_ERROR</td>
+                            <td th:text="${failure.count}">1</td>
+                            <td th:text="${failure.ratio} + '%'">40%</td>
+                            <td th:text="${failure.cumulativeRatio} + '%'">40%</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${#lists.isEmpty(failurePareto)}">실패 데이터가 없습니다.</div>
+            </div>
+        </article>
+
+        <article class="panel span-2">
+            <div class="panel-header">
+                <h2>Route Stability</h2>
+                <div class="toolbar">
+                    <span class="count" th:text="${#lists.size(routeStabilities)} + ' routes'">0 routes</span>
+                    <a class="ghost-link" href="/api/analytics/routes/stability">API</a>
+                </div>
+            </div>
+            <div class="table-wrap" th:if="${!#lists.isEmpty(routeStabilities)}">
+                <table>
+                    <thead><tr><th>Route</th><th>Jobs</th><th>Avg</th><th>StdDev</th><th>CV</th><th>Min / Max</th><th>Stability</th></tr></thead>
+                    <tbody>
+                    <tr th:each="routeStability : ${routeStabilities}">
+                        <td class="mono" th:text="${routeStability.route}">[A, B]</td>
+                        <td th:text="${routeStability.jobCount}">1</td>
+                        <td th:text="${routeStability.averageTransferTimeSeconds} + 's'">10s</td>
+                        <td th:text="${routeStability.standardDeviation}">0</td>
+                        <td th:text="${routeStability.coefficientOfVariation}">0</td>
+                        <td th:text="|${routeStability.minTransferTimeSeconds} / ${routeStability.maxTransferTimeSeconds}|">1 / 2</td>
+                        <td>
+                            <span class="badge"
+                                  th:classappend="${routeStability.stability.name() == 'UNSTABLE'} ? ' danger' : (${routeStability.stability.name() == 'MODERATE'} ? ' warn' : '')"
+                                  th:text="${routeStability.stability}">
+                                STABLE
+                            </span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(routeStabilities)}">완료된 경로 데이터가 없습니다.</div>
+        </article>
+
+        <article class="panel span-2">
+            <div class="panel-header">
+                <h2>Hourly Delay Trend</h2>
+                <div class="toolbar">
+                    <span class="count" th:text="${#lists.size(hourlyDelayTrends)} + ' hours'">0 hours</span>
+                    <a class="ghost-link" href="/api/analytics/delays/hourly-trend">API</a>
+                </div>
+            </div>
+            <div class="table-wrap" th:if="${!#lists.isEmpty(hourlyDelayTrends)}">
+                <table>
+                    <thead><tr><th>Hour</th><th>Total Completed</th><th>Delayed</th><th>Delay Rate</th><th>3h Moving Avg</th></tr></thead>
+                    <tbody>
+                    <tr th:each="trend : ${hourlyDelayTrends}">
+                        <td th:text="${trend.hour}">9</td>
+                        <td th:text="${trend.totalCompletedJobs}">0</td>
+                        <td th:text="${trend.delayedJobs}">0</td>
+                        <td th:text="${trend.delayRate} + '%'">0%</td>
+                        <td th:text="${trend.movingAverageDelayRate} + '%'">0%</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(hourlyDelayTrends)}">시간대별 완료 Job 데이터가 없습니다.</div>
         </article>
     </section>
 
@@ -566,7 +721,7 @@
             </div>
             <div class="table-wrap" th:if="${!#lists.isEmpty(transferJobs)}">
                 <table>
-                    <thead><tr><th>ID</th><th>Carrier</th><th>Route</th><th>Equipment</th><th>Status</th><th>Priority</th><th>ETA</th><th>Path</th><th>Action</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Carrier</th><th>Route</th><th>Equipment</th><th>Status</th><th>Priority</th><th>ETA / Actual</th><th>Started / Completed</th><th>Path</th><th>Action</th></tr></thead>
                     <tbody>
                     <tr th:each="job : ${transferJobs}">
                         <td th:text="${job.id}">1</td>
@@ -575,7 +730,8 @@
                         <td th:text="${job.assignedEquipmentCode != null ? job.assignedEquipmentCode : '-'}">-</td>
                         <td><span class="badge" th:classappend="${job.status.name() == 'FAILED'} ? ' danger' : (${job.status.name() == 'MOVING' || job.status.name() == 'ASSIGNED'} ? ' warn' : '')" th:text="${job.status}">CREATED</span></td>
                         <td th:text="${job.priority}">NORMAL</td>
-                        <td th:text="${job.estimatedTimeSeconds} + 's'">30s</td>
+                        <td th:text="|${job.estimatedTimeSeconds}s / ${job.actualTransferTimeSeconds != null ? job.actualTransferTimeSeconds + 's' : '-'}|">30s / -</td>
+                        <td th:text="|${job.startedAt != null ? job.startedAt : '-'} / ${job.completedAt != null ? job.completedAt : '-'}|">- / -</td>
                         <td class="mono" th:text="${job.path}">[A, B]</td>
                         <td>
                             <div class="actions">
@@ -599,6 +755,28 @@
                 </table>
             </div>
             <div class="empty" th:if="${#lists.isEmpty(transferJobs)}">생성된 Transfer Job 이 없습니다.</div>
+        </article>
+
+        <article class="panel" id="dispatch-section">
+            <div class="panel-header">
+                <h2>Dispatch Candidates</h2>
+                <span class="count" th:text="${#lists.size(dispatchCandidates)} + ' items'">0 items</span>
+            </div>
+            <div class="table-wrap" th:if="${!#lists.isEmpty(dispatchCandidates)}">
+                <table>
+                    <thead><tr><th>ID</th><th>Carrier</th><th>Priority</th><th>Route</th><th>Retry</th></tr></thead>
+                    <tbody>
+                    <tr th:each="candidate : ${dispatchCandidates}">
+                        <td th:text="${candidate.id}">1</td>
+                        <td class="mono" th:text="${candidate.carrierId}">FOUP-001</td>
+                        <td th:text="${candidate.priority}">NORMAL</td>
+                        <td th:text="${candidate.sourceNodeCode + ' -> ' + candidate.destinationNodeCode}">A -> B</td>
+                        <td th:text="${candidate.retryCount}">0</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(dispatchCandidates)}">현재 배정 후보가 없습니다.</div>
         </article>
 
         <article class="panel span-2" id="history-section">

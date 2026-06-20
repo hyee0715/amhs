@@ -1,5 +1,6 @@
 package com.example.amhs.dashboard.controller;
 
+import com.example.amhs.analytics.service.AnalyticsService;
 import com.example.amhs.alert.service.AlertService;
 import com.example.amhs.dashboard.service.DashboardService;
 import com.example.amhs.edge.domain.EdgeStatus;
@@ -49,6 +50,7 @@ public class DashboardViewController {
     private final TransferJobService transferJobService;
     private final AlertService alertService;
     private final RouteService routeService;
+    private final AnalyticsService analyticsService;
 
     @GetMapping({"/", "/dashboard"})
     public String dashboard(
@@ -63,7 +65,12 @@ public class DashboardViewController {
         model.addAttribute("edges", edgeService.getEdges());
         model.addAttribute("equipments", equipmentService.getEquipments());
         model.addAttribute("transferJobs", transferJobService.getTransferJobs());
+        model.addAttribute("dispatchCandidates", transferJobService.getDispatchCandidates());
         model.addAttribute("alerts", alertService.getAlerts());
+        model.addAttribute("transferTimeOutliers", analyticsService.getTransferTimeOutliers());
+        model.addAttribute("routeStabilities", analyticsService.getRouteStabilities());
+        model.addAttribute("failurePareto", analyticsService.getFailurePareto());
+        model.addAttribute("hourlyDelayTrends", analyticsService.getHourlyDelayTrends());
         model.addAttribute("nodeTypes", NodeType.values());
         model.addAttribute("nodeStatuses", NodeStatus.values());
         model.addAttribute("equipmentTypes", EquipmentType.values());
