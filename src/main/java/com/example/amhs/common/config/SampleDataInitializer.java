@@ -7,11 +7,18 @@ import com.example.amhs.equipment.repository.EquipmentRepository;
 import com.example.amhs.node.domain.AmhsNode;
 import com.example.amhs.node.domain.NodeType;
 import com.example.amhs.node.repository.NodeRepository;
+import com.example.amhs.transferjob.domain.TransferJobPriority;
+import com.example.amhs.transferjob.domain.TransferJobStatus;
+import com.example.amhs.transferjob.dto.TransferJobCreateRequest;
+import com.example.amhs.transferjob.dto.TransferJobStatusUpdateRequest;
+import com.example.amhs.transferjob.service.TransferJobService;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +30,8 @@ public class SampleDataInitializer implements ApplicationRunner {
     private final NodeRepository nodeRepository;
     private final EdgeRepository edgeRepository;
     private final EquipmentRepository equipmentRepository;
+    private final TransferJobService transferJobService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional
@@ -33,6 +42,7 @@ public class SampleDataInitializer implements ApplicationRunner {
 
         initializeNodesAndEdges();
         initializeEquipments();
+        initializeAnalyticsSampleJobs();
     }
 
     private boolean hasAnyData() {
@@ -72,5 +82,84 @@ public class SampleDataInitializer implements ApplicationRunner {
                 Equipment.create("OHT_002", "OHT 002", com.example.amhs.equipment.domain.EquipmentType.OHT),
                 Equipment.create("CONVEYOR_001", "Conveyor 001", com.example.amhs.equipment.domain.EquipmentType.CONVEYOR)
         ));
+    }
+
+    private void initializeAnalyticsSampleJobs() {
+        initializeStableRouteCompletedJobs();
+        initializeUnstableRouteCompletedJobs();
+        initializeFailureAnalyticsJobs();
+    }
+
+    private void initializeStableRouteCompletedJobs() {
+        createCompletedSampleJob("FOUP-STABLE-001", "EQP_01", 96, LocalDateTime.of(2026, 6, 18, 8, 10));
+        createCompletedSampleJob("FOUP-STABLE-002", "EQP_01", 101, LocalDateTime.of(2026, 6, 18, 9, 5));
+        createCompletedSampleJob("FOUP-STABLE-003", "EQP_01", 98, LocalDateTime.of(2026, 6, 18, 9, 35));
+        createCompletedSampleJob("FOUP-STABLE-004", "EQP_01", 100, LocalDateTime.of(2026, 6, 18, 10, 10));
+        createCompletedSampleJob("FOUP-STABLE-005", "EQP_01", 97, LocalDateTime.of(2026, 6, 18, 11, 0));
+        createCompletedSampleJob("FOUP-STABLE-006", "EQP_01", 99, LocalDateTime.of(2026, 6, 18, 12, 20));
+    }
+
+    private void initializeUnstableRouteCompletedJobs() {
+        createCompletedSampleJob("FOUP-UNSTABLE-001", "EQP_02", 82, LocalDateTime.of(2026, 6, 18, 10, 40));
+        createCompletedSampleJob("FOUP-UNSTABLE-002", "EQP_02", 110, LocalDateTime.of(2026, 6, 18, 11, 10));
+        createCompletedSampleJob("FOUP-UNSTABLE-003", "EQP_02", 145, LocalDateTime.of(2026, 6, 18, 11, 45));
+        createCompletedSampleJob("FOUP-UNSTABLE-004", "EQP_02", 90, LocalDateTime.of(2026, 6, 18, 12, 10));
+        createCompletedSampleJob("FOUP-UNSTABLE-005", "EQP_02", 175, LocalDateTime.of(2026, 6, 18, 13, 0));
+        createCompletedSampleJob("FOUP-UNSTABLE-006", "EQP_02", 240, LocalDateTime.of(2026, 6, 18, 13, 40));
+    }
+
+    private void initializeFailureAnalyticsJobs() {
+        createFailedSampleJob("FOUP-FAIL-001", "EQP_01", "EQUIPMENT_ERROR");
+        createFailedSampleJob("FOUP-FAIL-002", "EQP_01", "EQUIPMENT_ERROR");
+        createFailedSampleJob("FOUP-FAIL-003", "EQP_02", "EQUIPMENT_ERROR");
+        createFailedSampleJob("FOUP-FAIL-004", "EQP_02", "NODE_BLOCKED");
+        createFailedSampleJob("FOUP-FAIL-005", "EQP_01", "NODE_BLOCKED");
+        createFailedSampleJob("FOUP-FAIL-006", "EQP_02", "EDGE_BLOCKED");
+        createFailedSampleJob("FOUP-FAIL-007", "EQP_01", "NO_AVAILABLE_EQUIPMENT");
+    }
+
+    private void createCompletedSampleJob(String carrierId, String destinationNodeCode, int actualSeconds, LocalDateTime completedAt) {
+        var created = transferJobService.createTransferJob(
+                new TransferJobCreateRequest(
+                        carrierId,
+                        "STOCKER_01",
+                        destinationNodeCode,
+                        TransferJobPriority.NORMAL
+                )
+        );
+        transferJobService.assignTransferJob(created.id());
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.MOVING, "Sample moving", null)
+        );
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.COMPLETED, null, null)
+        );
+
+        LocalDateTime startedAt = completedAt.minusSeconds(actualSeconds);
+        jdbcTemplate.update(
+                "update transfer_jobs set started_at = ?, completed_at = ?, actual_transfer_time_seconds = ? where id = ?",
+                startedAt,
+                completedAt,
+                actualSeconds,
+                created.id()
+        );
+    }
+
+    private void createFailedSampleJob(String carrierId, String destinationNodeCode, String failureReason) {
+        var created = transferJobService.createTransferJob(
+                new TransferJobCreateRequest(
+                        carrierId,
+                        "STOCKER_01",
+                        destinationNodeCode,
+                        TransferJobPriority.NORMAL
+                )
+        );
+        transferJobService.assignTransferJob(created.id());
+        transferJobService.updateTransferJobStatus(
+                created.id(),
+                new TransferJobStatusUpdateRequest(TransferJobStatus.FAILED, failureReason, null)
+        );
     }
 }
