@@ -128,6 +128,46 @@ class RouteServiceTest {
     }
 
     @Test
+    @DisplayName("전략에 따라 같은 출발지와 도착지에서도 다른 경로를 반환한다")
+    void findDifferentRoutesByStrategy() {
+        edgeRepository.deleteAll();
+        nodeRepository.deleteAll();
+
+        AmhsNode stocker = nodeRepository.save(AmhsNode.create("STOCKER_01", "Stocker 01", NodeType.STOCKER));
+        AmhsNode nodeA = nodeRepository.save(AmhsNode.create("NODE_A", "Node A", NodeType.OHT_NODE));
+        AmhsNode nodeB = nodeRepository.save(AmhsNode.create("NODE_B", "Node B", NodeType.OHT_NODE));
+        AmhsNode nodeC = nodeRepository.save(AmhsNode.create("NODE_C", "Node C", NodeType.OHT_NODE));
+        AmhsNode nodeD = nodeRepository.save(AmhsNode.create("NODE_D", "Node D", NodeType.OHT_NODE));
+
+        AmhsEdge congestedEdge = AmhsEdge.create(nodeA, nodeD, 85, 25);
+        congestedEdge.changeCongestionLevel(100);
+
+        edgeRepository.saveAll(List.of(
+                AmhsEdge.create(stocker, nodeA, 100, 30),
+                AmhsEdge.create(nodeA, nodeB, 120, 40),
+                AmhsEdge.create(stocker, nodeC, 150, 50),
+                AmhsEdge.create(nodeC, nodeD, 70, 20),
+                congestedEdge,
+                AmhsEdge.create(nodeB, nodeA, 120, 40),
+                AmhsEdge.create(nodeA, stocker, 100, 30)
+        ));
+
+        RouteResult bfsRoute = routeService.findRouteByBfs("NODE_B", "NODE_D");
+        RouteResult timeRoute = routeService.findRouteByDijkstra("NODE_B", "NODE_D");
+        RouteResult congestionAwareRoute = routeService.findRouteByDijkstra(
+                "NODE_B",
+                "NODE_D",
+                RouteSearchStrategy.CONGESTION_AWARE
+        );
+
+        assertThat(bfsRoute.path()).isEqualTo(List.of("NODE_B", "NODE_A", "NODE_D"));
+        assertThat(timeRoute.path()).isEqualTo(List.of("NODE_B", "NODE_A", "NODE_D"));
+        assertThat(congestionAwareRoute.path()).isEqualTo(
+                List.of("NODE_B", "NODE_A", "STOCKER_01", "NODE_C", "NODE_D")
+        );
+    }
+
+    @Test
     @DisplayName("BLOCKED Node는 제외하고 우회 경로를 탐색한다")
     void findRouteExcludingBlockedNode() {
         AmhsNode nodeB = nodeRepository.findByCode("NODE_B").orElseThrow();

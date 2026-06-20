@@ -57,6 +57,8 @@ public class SampleDataInitializer implements ApplicationRunner {
         AmhsNode nodeD = nodeRepository.save(AmhsNode.create("NODE_D", "Node D", NodeType.OHT_NODE));
         AmhsNode eqp01 = nodeRepository.save(AmhsNode.create("EQP_01", "Equipment 01", NodeType.EQP));
         AmhsNode eqp02 = nodeRepository.save(AmhsNode.create("EQP_02", "Equipment 02", NodeType.EQP));
+        AmhsEdge congestedNodeAToNodeD = AmhsEdge.create(nodeA, nodeD, 85, 25);
+        congestedNodeAToNodeD.changeCongestionLevel(100);
 
         edgeRepository.saveAll(List.of(
                 AmhsEdge.create(stocker01, nodeA, 100, 30),
@@ -65,7 +67,7 @@ public class SampleDataInitializer implements ApplicationRunner {
                 AmhsEdge.create(stocker01, nodeC, 150, 50),
                 AmhsEdge.create(nodeC, nodeD, 70, 20),
                 AmhsEdge.create(nodeD, eqp02, 90, 30),
-                AmhsEdge.create(nodeA, nodeD, 85, 25),
+                congestedNodeAToNodeD,
                 AmhsEdge.create(nodeA, stocker01, 100, 30),
                 AmhsEdge.create(nodeB, nodeA, 120, 40),
                 AmhsEdge.create(eqp01, nodeB, 80, 30),
