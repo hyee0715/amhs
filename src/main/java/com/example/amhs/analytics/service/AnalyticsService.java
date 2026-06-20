@@ -1,5 +1,7 @@
 package com.example.amhs.analytics.service;
 
+import com.example.amhs.analytics.dto.RouteStabilityLevel;
+import com.example.amhs.analytics.dto.RouteStabilityResponse;
 import com.example.amhs.analytics.dto.TransferTimeOutlierJobResponse;
 import com.example.amhs.analytics.dto.TransferTimeOutlierResponse;
 import com.example.amhs.transferjob.domain.TransferJob;
@@ -8,8 +10,11 @@ import com.example.amhs.transferjob.repository.TransferJobRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +64,24 @@ public class AnalyticsService {
         );
     }
 
+    public List<RouteStabilityResponse> getRouteStabilities() {
+        List<TransferJob> completedJobs = transferJobRepository.findByStatusAndActualTransferTimeSecondsIsNotNull(
+                TransferJobStatus.COMPLETED
+        ).stream()
+                .filter(job -> job.getPath() != null)
+                .toList();
+
+        Map<String, List<TransferJob>> jobsByRoute = completedJobs.stream()
+                .collect(Collectors.groupingBy(TransferJob::getPath));
+
+        return jobsByRoute.entrySet().stream()
+                .map(entry -> toRouteStabilityResponse(entry.getKey(), entry.getValue()))
+                .sorted(Comparator
+                        .comparing((RouteStabilityResponse response) -> stabilityRank(response.stability()))
+                        .thenComparing(RouteStabilityResponse::coefficientOfVariation, Comparator.reverseOrder()))
+                .toList();
+    }
+
     private TransferTimeOutlierJobResponse toTransferTimeOutlierJobResponse(TransferJob job) {
         return new TransferTimeOutlierJobResponse(
                 job.getId(),
@@ -68,6 +91,32 @@ public class AnalyticsService {
                 job.getActualTransferTimeSeconds(),
                 fromJson(job.getPath()),
                 job.getCompletedAt()
+        );
+    }
+
+    private RouteStabilityResponse toRouteStabilityResponse(String routeJson, List<TransferJob> jobs) {
+        List<Integer> transferTimes = jobs.stream()
+                .map(TransferJob::getActualTransferTimeSeconds)
+                .toList();
+
+        long jobCount = transferTimes.size();
+        double average = roundToTwoDecimals(calculateAverage(transferTimes));
+        double standardDeviation = jobCount == 1
+                ? 0.0
+                : roundToTwoDecimals(calculatePopulationStandardDeviation(transferTimes, average));
+        double coefficientOfVariation = average == 0.0
+                ? 0.0
+                : roundToTwoDecimals(standardDeviation / average);
+
+        return new RouteStabilityResponse(
+                fromJson(routeJson),
+                jobCount,
+                average,
+                standardDeviation,
+                coefficientOfVariation,
+                transferTimes.stream().min(Integer::compareTo).orElse(0),
+                transferTimes.stream().max(Integer::compareTo).orElse(0),
+                classifyStability(jobCount, coefficientOfVariation)
         );
     }
 
@@ -100,6 +149,39 @@ public class AnalyticsService {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to deserialize path", exception);
         }
+    }
+
+    private double calculateAverage(List<Integer> values) {
+        return values.stream()
+                .mapToInt(Integer::intValue)
+                .average()
+                .orElse(0.0);
+    }
+
+    private double calculatePopulationStandardDeviation(List<Integer> values, double average) {
+        double variance = values.stream()
+                .mapToDouble(value -> Math.pow(value - average, 2))
+                .average()
+                .orElse(0.0);
+        return Math.sqrt(variance);
+    }
+
+    private RouteStabilityLevel classifyStability(long jobCount, double coefficientOfVariation) {
+        if (jobCount == 1 || coefficientOfVariation < 0.15) {
+            return RouteStabilityLevel.STABLE;
+        }
+        if (coefficientOfVariation < 0.35) {
+            return RouteStabilityLevel.MODERATE;
+        }
+        return RouteStabilityLevel.UNSTABLE;
+    }
+
+    private int stabilityRank(RouteStabilityLevel stability) {
+        return switch (stability) {
+            case UNSTABLE -> 0;
+            case MODERATE -> 1;
+            case STABLE -> 2;
+        };
     }
 
     private double roundToTwoDecimals(double value) {
