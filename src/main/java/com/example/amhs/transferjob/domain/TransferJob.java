@@ -185,6 +185,14 @@ public class TransferJob extends BaseTimeEntity {
         this.failureReason = null;
     }
 
+    public void overrideCompletionMetrics(LocalDateTime startedAt, LocalDateTime completedAt, int actualTransferTimeSeconds) {
+        this.startedAt = startedAt;
+        this.completedAt = completedAt;
+        this.actualTransferTimeSeconds = actualTransferTimeSeconds;
+        this.failedAt = null;
+        this.status = TransferJobStatus.COMPLETED;
+    }
+
     public void clearAssignedEquipment() {
         this.assignedEquipment = null;
     }

@@ -11,6 +11,7 @@ import com.example.amhs.transferjob.domain.TransferJobPriority;
 import com.example.amhs.transferjob.domain.TransferJobStatus;
 import com.example.amhs.transferjob.dto.TransferJobCreateRequest;
 import com.example.amhs.transferjob.dto.TransferJobStatusUpdateRequest;
+import com.example.amhs.transferjob.repository.TransferJobRepository;
 import com.example.amhs.transferjob.service.TransferJobService;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +31,7 @@ public class SampleDataInitializer implements ApplicationRunner {
     private final EdgeRepository edgeRepository;
     private final EquipmentRepository equipmentRepository;
     private final TransferJobService transferJobService;
-    private final JdbcTemplate jdbcTemplate;
+    private final TransferJobRepository transferJobRepository;
 
     @Override
     @Transactional
@@ -138,13 +138,8 @@ public class SampleDataInitializer implements ApplicationRunner {
         );
 
         LocalDateTime startedAt = completedAt.minusSeconds(actualSeconds);
-        jdbcTemplate.update(
-                "update transfer_jobs set started_at = ?, completed_at = ?, actual_transfer_time_seconds = ? where id = ?",
-                startedAt,
-                completedAt,
-                actualSeconds,
-                created.id()
-        );
+        transferJobRepository.findById(created.id())
+                .ifPresent(job -> job.overrideCompletionMetrics(startedAt, completedAt, actualSeconds));
     }
 
     private void createFailedSampleJob(String carrierId, String destinationNodeCode, String failureReason) {

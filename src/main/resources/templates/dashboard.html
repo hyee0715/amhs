@@ -419,8 +419,8 @@
         </div>
     </section>
 
-    <div class="message success" th:if="${successMessage}" th:text="${successMessage}">Success</div>
-    <div class="message error" th:if="${errorMessage}" th:text="${errorMessage}">Error</div>
+    <div class="message success" th:if="${successMessage != null}" th:text="${successMessage}">Success</div>
+    <div class="message error" th:if="${errorMessage != null}" th:text="${errorMessage}">Error</div>
 
     <nav class="section-nav">
         <a href="#create-tools">생성</a>
@@ -633,27 +633,27 @@
                         <a class="ghost-link" href="/dashboard">초기화</a>
                     </div>
                 </form>
-                <div class="route-results" th:if="${bfsRouteResult || dijkstraRouteResult || bfsRouteError || dijkstraRouteError}">
+                <div class="route-results" th:if="${bfsRouteResult != null or dijkstraRouteResult != null or bfsRouteError != null or dijkstraRouteError != null}">
                     <div class="route-box">
                         <div><strong>BFS</strong></div>
                         <div class="helper">최단 hop 기준</div>
-                        <div th:if="${bfsRouteResult}">
+                        <div th:if="${bfsRouteResult != null}">
                             <div><strong>Path:</strong> <span class="mono" th:text="${bfsRouteResult.path}">[A, B]</span></div>
                             <div><strong>Total Distance:</strong> <span th:text="${bfsRouteResult.totalDistance}">0</span></div>
                             <div><strong>Total ETA:</strong> <span th:text="${bfsRouteResult.totalEstimatedTimeSeconds} + 's'">0s</span></div>
                         </div>
-                        <div class="message error" th:if="${bfsRouteError}" th:text="${bfsRouteError}" style="margin-top:12px; margin-bottom:0;">BFS error</div>
+                        <div class="message error" th:if="${bfsRouteError != null}" th:text="${bfsRouteError}" style="margin-top:12px; margin-bottom:0;">BFS error</div>
                     </div>
                     <div class="route-box">
                         <div><strong>Dijkstra</strong></div>
                         <div class="helper">전략: <span th:text="${selectedStrategy}">TIME</span></div>
-                        <div th:if="${dijkstraRouteResult}">
+                        <div th:if="${dijkstraRouteResult != null}">
                             <div><strong>Algorithm:</strong> <span th:text="${dijkstraRouteResult.algorithm}">DIJKSTRA_TIME</span></div>
                             <div><strong>Path:</strong> <span class="mono" th:text="${dijkstraRouteResult.path}">[A, B]</span></div>
                             <div><strong>Total Distance:</strong> <span th:text="${dijkstraRouteResult.totalDistance}">0</span></div>
                             <div><strong>Total ETA:</strong> <span th:text="${dijkstraRouteResult.totalEstimatedTimeSeconds} + 's'">0s</span></div>
                         </div>
-                        <div class="message error" th:if="${dijkstraRouteError}" th:text="${dijkstraRouteError}" style="margin-top:12px; margin-bottom:0;">Dijkstra error</div>
+                        <div class="message error" th:if="${dijkstraRouteError != null}" th:text="${dijkstraRouteError}" style="margin-top:12px; margin-bottom:0;">Dijkstra error</div>
                     </div>
                 </div>
             </div>
@@ -728,10 +728,10 @@
                         <td class="mono" th:text="${job.carrierId}">CARRIER-01</td>
                         <td th:text="${job.sourceNodeCode + ' -> ' + job.destinationNodeCode}">A -> B</td>
                         <td th:text="${job.assignedEquipmentCode != null ? job.assignedEquipmentCode : '-'}">-</td>
-                        <td><span class="badge" th:classappend="${job.status.name() == 'FAILED'} ? ' danger' : (${job.status.name() == 'MOVING' || job.status.name() == 'ASSIGNED'} ? ' warn' : '')" th:text="${job.status}">CREATED</span></td>
+                        <td><span class="badge" th:classappend="${job.status.name() == 'FAILED'} ? ' danger' : (${job.status.name() == 'MOVING' or job.status.name() == 'ASSIGNED'} ? ' warn' : '')" th:text="${job.status}">CREATED</span></td>
                         <td th:text="${job.priority}">NORMAL</td>
-                        <td th:text="|${job.estimatedTimeSeconds}s / ${job.actualTransferTimeSeconds != null ? job.actualTransferTimeSeconds + 's' : '-'}|">30s / -</td>
-                        <td th:text="|${job.startedAt != null ? job.startedAt : '-'} / ${job.completedAt != null ? job.completedAt : '-'}|">- / -</td>
+                        <td th:text="${job.estimatedTimeSeconds + 's / ' + (job.actualTransferTimeSeconds != null ? job.actualTransferTimeSeconds + 's' : '-')}">30s / -</td>
+                        <td th:text="${(job.startedAt != null ? job.startedAt : '-') + ' / ' + (job.completedAt != null ? job.completedAt : '-')}">- / -</td>
                         <td class="mono" th:text="${job.path}">[A, B]</td>
                         <td>
                             <div class="actions">
@@ -788,7 +788,7 @@
                         <select name="historyJobId">
                             <option value="">Job 선택</option>
                             <option th:each="job : ${transferJobs}" th:value="${job.id}" th:text="|#${job.id} ${job.carrierId}|"
-                                    th:selected="${selectedHistoryJobId != null && selectedHistoryJobId == job.id}"></option>
+                                    th:selected="${selectedHistoryJobId != null and selectedHistoryJobId == job.id}"></option>
                         </select>
                         <button type="submit" class="secondary">조회</button>
                     </form>
@@ -800,7 +800,7 @@
                     <tbody>
                     <tr th:each="history : ${jobHistories}">
                         <td th:text="${history.id}">1</td>
-                        <td><span class="badge" th:classappend="${history.status.name() == 'FAILED'} ? ' danger' : (${history.status.name() == 'ASSIGNED' || history.status.name() == 'MOVING'} ? ' warn' : '')" th:text="${history.status}">CREATED</span></td>
+                        <td><span class="badge" th:classappend="${history.status.name() == 'FAILED'} ? ' danger' : (${history.status.name() == 'ASSIGNED' or history.status.name() == 'MOVING'} ? ' warn' : '')" th:text="${history.status}">CREATED</span></td>
                         <td th:text="${history.assignedEquipmentCode != null ? history.assignedEquipmentCode : '-'}">-</td>
                         <td th:text="${history.reason != null ? history.reason : '-'}">-</td>
                         <td class="mono" th:text="${history.pathSnapshot}">[A, B]</td>
@@ -809,9 +809,9 @@
                     </tbody>
                 </table>
             </div>
-            <div class="message error" th:if="${historyError}" th:text="${historyError}" style="margin:16px 18px 0;">History error</div>
+            <div class="message error" th:if="${historyError != null}" th:text="${historyError}" style="margin:16px 18px 0;">History error</div>
             <div class="empty" th:if="${selectedHistoryJobId == null}">Transfer Job 목록의 `이력 보기` 또는 위 선택창으로 조회하세요.</div>
-            <div class="empty" th:if="${selectedHistoryJobId != null && jobHistories != null && #lists.isEmpty(jobHistories)}">이력이 없습니다.</div>
+            <div class="empty" th:if="${selectedHistoryJobId != null and jobHistories != null and #lists.isEmpty(jobHistories)}">이력이 없습니다.</div>
         </article>
 
         <article class="panel" id="edge-section">
