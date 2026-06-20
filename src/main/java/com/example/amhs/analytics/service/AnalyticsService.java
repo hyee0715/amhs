@@ -1,5 +1,6 @@
 package com.example.amhs.analytics.service;
 
+import com.example.amhs.analytics.dto.FailureParetoResponse;
 import com.example.amhs.analytics.dto.RouteStabilityLevel;
 import com.example.amhs.analytics.dto.RouteStabilityResponse;
 import com.example.amhs.analytics.dto.TransferTimeOutlierJobResponse;
@@ -78,8 +79,42 @@ public class AnalyticsService {
                 .map(entry -> toRouteStabilityResponse(entry.getKey(), entry.getValue()))
                 .sorted(Comparator
                         .comparing((RouteStabilityResponse response) -> stabilityRank(response.stability()))
-                        .thenComparing(RouteStabilityResponse::coefficientOfVariation, Comparator.reverseOrder()))
+                .thenComparing(RouteStabilityResponse::coefficientOfVariation, Comparator.reverseOrder()))
                 .toList();
+    }
+
+    public List<FailureParetoResponse> getFailurePareto() {
+        List<TransferJob> failedJobs = transferJobRepository.findByStatus(TransferJobStatus.FAILED).stream()
+                .filter(job -> job.getFailureReason() != null && !job.getFailureReason().isBlank())
+                .toList();
+
+        if (failedJobs.isEmpty()) {
+            return List.of();
+        }
+
+        long totalFailureCount = failedJobs.size();
+        Map<String, Long> countsByFailureReason = failedJobs.stream()
+                .collect(Collectors.groupingBy(TransferJob::getFailureReason, Collectors.counting()));
+
+        List<Map.Entry<String, Long>> sortedEntries = countsByFailureReason.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue(Comparator.reverseOrder())
+                        .thenComparing(Map.Entry.comparingByKey()))
+                .toList();
+
+        double cumulativeRatio = 0.0;
+        List<FailureParetoResponse> responses = new ArrayList<>();
+        for (Map.Entry<String, Long> entry : sortedEntries) {
+            double ratio = roundToTwoDecimals(entry.getValue() * 100.0 / totalFailureCount);
+            cumulativeRatio = roundToTwoDecimals(cumulativeRatio + ratio);
+            responses.add(new FailureParetoResponse(
+                    entry.getKey(),
+                    entry.getValue(),
+                    ratio,
+                    cumulativeRatio
+            ));
+        }
+
+        return responses;
     }
 
     private TransferTimeOutlierJobResponse toTransferTimeOutlierJobResponse(TransferJob job) {
