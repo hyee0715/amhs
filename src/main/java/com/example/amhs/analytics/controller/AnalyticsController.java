@@ -1,6 +1,7 @@
 package com.example.amhs.analytics.controller;
 
 import com.example.amhs.analytics.dto.FailureParetoResponse;
+import com.example.amhs.analytics.dto.HourlyDelayTrendResponse;
 import com.example.amhs.analytics.dto.RouteStabilityResponse;
 import com.example.amhs.analytics.dto.TransferTimeOutlierResponse;
 import com.example.amhs.analytics.service.AnalyticsService;
@@ -37,5 +38,11 @@ public class AnalyticsController {
     @Operation(summary = "실패 원인 파레토 분석")
     public ResponseEntity<List<FailureParetoResponse>> getFailurePareto() {
         return ResponseEntity.ok(analyticsService.getFailurePareto());
+    }
+
+    @GetMapping("/delays/hourly-trend")
+    @Operation(summary = "시간대별 지연률 및 3시간 이동평균 추세 분석")
+    public ResponseEntity<List<HourlyDelayTrendResponse>> getHourlyDelayTrends() {
+        return ResponseEntity.ok(analyticsService.getHourlyDelayTrends());
     }
 }

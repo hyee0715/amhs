@@ -1,6 +1,7 @@
 package com.example.amhs.analytics.service;
 
 import com.example.amhs.analytics.dto.FailureParetoResponse;
+import com.example.amhs.analytics.dto.HourlyDelayTrendResponse;
 import com.example.amhs.analytics.dto.RouteStabilityLevel;
 import com.example.amhs.analytics.dto.RouteStabilityResponse;
 import com.example.amhs.analytics.dto.TransferTimeOutlierJobResponse;
@@ -13,6 +14,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -111,6 +113,56 @@ public class AnalyticsService {
                     entry.getValue(),
                     ratio,
                     cumulativeRatio
+            ));
+        }
+
+        return responses;
+    }
+
+    public List<HourlyDelayTrendResponse> getHourlyDelayTrends() {
+        List<TransferJob> completedJobs = transferJobRepository.findByStatusAndActualTransferTimeSecondsIsNotNull(
+                TransferJobStatus.COMPLETED
+        ).stream()
+                .filter(job -> job.getCompletedAt() != null)
+                .toList();
+
+        Map<Integer, List<TransferJob>> jobsByHour = completedJobs.stream()
+                .collect(Collectors.groupingBy(job -> job.getCompletedAt().getHour()));
+
+        List<HourlyDelayTrendResponse> responses = jobsByHour.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    long totalCompletedJobs = entry.getValue().size();
+                    long delayedJobs = entry.getValue().stream()
+                            .filter(job -> job.getActualTransferTimeSeconds() > job.getEstimatedTimeSeconds())
+                            .count();
+                    double delayRate = roundToTwoDecimals(delayedJobs * 100.0 / totalCompletedJobs);
+                    return new HourlyDelayTrendResponse(
+                            entry.getKey(),
+                            totalCompletedJobs,
+                            delayedJobs,
+                            delayRate,
+                            0.0
+                    );
+                })
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        for (int i = 0; i < responses.size(); i++) {
+            int startIndex = Math.max(0, i - 2);
+            double movingAverageDelayRate = roundToTwoDecimals(
+                    responses.subList(startIndex, i + 1).stream()
+                            .mapToDouble(HourlyDelayTrendResponse::delayRate)
+                            .average()
+                            .orElse(0.0)
+            );
+
+            HourlyDelayTrendResponse current = responses.get(i);
+            responses.set(i, new HourlyDelayTrendResponse(
+                    current.hour(),
+                    current.totalCompletedJobs(),
+                    current.delayedJobs(),
+                    current.delayRate(),
+                    movingAverageDelayRate
             ));
         }
 
